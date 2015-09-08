@@ -11,8 +11,6 @@ import time
 
 from upnp_http import UpnpHttp
 
-from common import LegrandError
-
 
 class UpnpThread(threading.Thread):
 
@@ -36,7 +34,7 @@ class UpnpThread(threading.Thread):
         while not self._stop.is_set():
             try:
                 temp = self._upnp_socket.listening()
-            except LegrandError:
+            except Exception:	# Lionel: FIXME: be more specific on exception... was LegrandError
                 pass
             else:
                 self._queue.put(temp)

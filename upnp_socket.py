@@ -8,8 +8,6 @@ import select
 import socket
 import struct
 
-from common import LegrandError
-
 
 class UpnpSocket:
 
@@ -57,7 +55,7 @@ class UpnpSocket:
                 sock.setsockopt(socket.SOL_SOCKET, IN.SO_BINDTODEVICE, optval)
             return sock
         except StandardError:
-            raise LegrandError('Unable to create client')
+            raise Exception('Unable to create client')
 
     def _create_server(self, socket_ipv4_address):
         """  create an UDP server socket bind to socket_ipv4_address """
@@ -72,7 +70,7 @@ class UpnpSocket:
             sock.bind(socket_ipv4_address)
             return sock
         except StandardError:
-            raise LegrandError('Unable to create server')
+            raise Exception('Unable to create server')
 
     def _join_multicast_group(self):
         """ join multicast group """
@@ -81,7 +79,7 @@ class UpnpSocket:
             mreq = struct.pack('4sl', socket.inet_aton(UpnpSocket.SSDP_MULTICAST_IPV4), socket.INADDR_ANY)
             self.ssock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         except StandardError:
-            raise LegrandError('Unable to join multicast')
+            raise Exception('Unable to join multicast')
 
     def init_sockets(self):
         """ initialize socket """
@@ -105,11 +103,11 @@ class UpnpSocket:
         """ Send network data """
 
         if not sock:
-            raise LegrandError('No socket defined')
+            raise Exception('No socket defined')
         try:
             sock.sendto(data, (UpnpSocket.SSDP_MULTICAST_IPV4, UpnpSocket.SSDP_MULTICAST_PORT))
         except StandardError:
-            raise LegrandError('Data not sent')
+            raise Exception('Data not sent')
 
     def recvfrom(self, sock, size=1024):
         """ Receive network data """
@@ -124,9 +122,9 @@ class UpnpSocket:
             if ready:
                 return sock.recvfrom(size)
             else:
-                raise LegrandError('Socket not ready')
+                raise Exception('Socket not ready')
         except StandardError:
-            raise LegrandError('No data received')
+            raise Exception('No data received')
 
     def listening(self):
         """ listening for UPnP packets """
@@ -134,7 +132,7 @@ class UpnpSocket:
         try:
             temp = self.recvfrom(self.ssock)
         except socket.timeout:
-            raise LegrandError('Socket timeout')
+            raise Exception('Socket timeout')
         else:
             return temp
 

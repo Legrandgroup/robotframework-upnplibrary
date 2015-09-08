@@ -3,8 +3,6 @@
 
 """ Legrand MP5B """
 
-from common import LegrandError
-
 
 class UpnpHttp:
 
@@ -65,9 +63,9 @@ class UpnpHttp:
         try:
             temp = int(data)
         except StandardError:
-            raise LegrandError('Value %s is not an integer' % data)
+            raise Exception('Value %s is not an integer' % data)
         if temp < mini or temp > maxi:
-            raise LegrandError('Integer %s is not in [%d;%d] range' % (data, mini, maxi))
+            raise Exception('Integer %s is not in [%d;%d] range' % (data, mini, maxi))
         return temp
 
     @staticmethod

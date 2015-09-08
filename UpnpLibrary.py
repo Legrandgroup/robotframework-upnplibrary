@@ -14,7 +14,6 @@ from upnp_http import UpnpHttp
 from upnp_socket import UpnpSocket
 from upnp_thread import UpnpThread
 
-from common import LegrandError
 from ToolLibrary import ToolLibrary
 
 
@@ -50,7 +49,7 @@ class UpnpLibrary:
             try:
                 self._upnp_thread.start()
             except StandardError:
-                raise LegrandError('Thread already started')
+                raise Exception('Thread already started')
 
     def stop(self):
         """ Stop UPnP thread.
@@ -65,7 +64,7 @@ class UpnpLibrary:
                 try:
                     self._upnp_thread.join()
                 except RuntimeError:
-                    raise LegrandError('Join deadlock')
+                    raise Exception('Join deadlock')
                 self._upnp_thread = None
 
     def get_ip(self, mac):
@@ -87,7 +86,7 @@ class UpnpLibrary:
         while True:
             time.sleep(UpnpLibrary.POLL_WAIT)
             if time.time() > maxtime:
-                raise LegrandError('Expected one NOTIFY/alive')
+                raise Exception('Expected one NOTIFY/alive')
             temp = self._upnp_thread.wait(wait_test, address=None, timeout=UpnpLibrary.BURST)
             if temp is not None:
                 (data, addr) = temp
@@ -126,7 +125,7 @@ class UpnpLibrary:
         wait_test = {'start': self._upnp_http.generate_start_notify(eol=False), 'NTS': 'ssdp:byebye'}
         data = self._upnp_thread.wait(wait_test, address=addr, timeout=UpnpLibrary.BURST)
         if not data:
-            raise LegrandError('Expected one NOTIFY/byebye')
+            raise Exception('Expected one NOTIFY/byebye')
         return data
 
     def check_on(self, addr):
@@ -146,7 +145,7 @@ class UpnpLibrary:
         wait_test = {'start': self._upnp_http.generate_start_response(eol=False)}
         data = self._upnp_thread.wait(wait_test, address=addr, timeout=UpnpLibrary.BURST)
         if not data:
-            raise LegrandError('Expected one response')
+            raise Exception('Expected one response')
         return data
 
     def check_run(self, addr):
@@ -164,7 +163,7 @@ class UpnpLibrary:
         wait_test = {'start': self._upnp_http.generate_start_notify(eol=False), 'NTS': 'ssdp:alive'}
         data = self._upnp_thread.wait(wait_test, address=addr, timeout=UpnpLibrary.BURST)
         if not data:
-            raise LegrandError('Expected one NOTIFY/alive')
+            raise Exception('Expected one NOTIFY/alive')
         return data
 
     def check_stop(self, addr):
@@ -178,7 +177,7 @@ class UpnpLibrary:
         wait_test = {'start': self._upnp_http.generate_start_notify(eol=False), 'NTS': 'ssdp:alive'}
         data = self._upnp_thread.wait(wait_test, address=addr, timeout=UpnpLibrary.BURST)
         if data:
-            raise LegrandError('Expected no NOTIFY')
+            raise Exception('Expected no NOTIFY')
 
     @staticmethod
     def retrieve_xml(data):
@@ -198,11 +197,11 @@ class UpnpLibrary:
             data_parsed = data[0]
             url = data_parsed['LOCATION']
         except StandardError:
-            raise LegrandError('No location')
+            raise Exception('No location')
         try:
             ret = urllib.urlretrieve(url)[0]
         except StandardError:
-            raise LegrandError('Unable to retrieve xml')
+            raise Exception('Unable to retrieve xml')
         ret = unicode(ret)
         return ret
 
