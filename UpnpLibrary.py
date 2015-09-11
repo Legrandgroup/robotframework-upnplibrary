@@ -14,6 +14,8 @@ class UpnpDevice:
     """Description of an UPnP device (this is a data container without any method (the equivalent of a C-struct))"""
     
     def __init__(self,
+                 hostname,
+                 port, 
                  device_type,
                  friendly_name,
                  location,
@@ -26,6 +28,8 @@ class UpnpDevice:
                  presentation_url,
                  serial_number,
                  mac_address = None):
+        self.hostname = hostname
+        self.port = port
         self.device_type = device_type
         self.friendly_name = friendly_name
         self.location = location
@@ -40,7 +44,13 @@ class UpnpDevice:
         self.mac_address = mac_address
 
     def __repr__(self):
-        result = '[' + str(self.friendly_name)
+        if self.hostname:
+            result = '[' + str(self.hostname)
+            if not self.port is None:
+                result += ':' + str(self.port)
+            result += ']'
+            
+        result += '[' + str(self.friendly_name)
         result += '(' + str(self.device_type) + ')'
         if not self.mac_address is None:
             result += ',MAC=' + str(self.mac_address) + ')'
@@ -95,6 +105,8 @@ value:%s
         udn = proxy.get_udn()
         
         purl = presentation_url
+        purl_hostname = None
+        purl_port = None
         purl_array_proto = purl.split('//')
         if len(purl_array_proto)>1:   # Split did find '//'
             purl_proto = purl_array_proto[0].rstrip(':')
@@ -118,7 +130,9 @@ value:%s
 
         print('Got device with hostname=' + purl_hostname + ', port=' + purl_port)
 
-        upnp_device = UpnpDevice(proxy.get_device_type(),
+        upnp_device = UpnpDevice(purl_hostname,
+                                 purl_port,
+                                 proxy.get_device_type(),
                                  proxy.get_friendly_name(),
                                  proxy.get_location(),
                                  proxy.get_manufacturer(),
