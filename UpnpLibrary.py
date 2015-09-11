@@ -99,17 +99,18 @@ value:%s
         if len(purl_array_proto)>1:   # Split did find '//'
             purl_proto = purl_array_proto[0].rstrip(':')
             purl = purl_array_proto[1]
+
+        try:
+            purl_path_sep_index = purl.index('/')
+            purl_path = purl[purl_path_sep_index+1:]
+            purl = purl[:purl_path_sep_index]
+        except ValueError:
+            pass
         
         try:
             purl_port_sep_index = purl.index(':')
             purl_hostname = purl[:purl_port_sep_index]
             purl_port = purl[purl_port_sep_index+1:]
-            try:
-                purl_path_sep_index = purl_port.index('/')
-                purl_port = purl[:purl_path_sep_index]
-            except ValueError:
-                pass
-                
         except ValueError:
             # Not ':' found
             purl_hostname = purl
@@ -157,7 +158,7 @@ value:%s
             msg += ' with details ' + str(upnp_device)
         msg += ' to internal db'
         logger.debug(msg)
-        self._database[key] = upnp_service
+        self._database[key] = upnp_device
             
         #print('service_types: ' + str(proxy.list_service_types()))    # Should be GLib.free()'d and list should also be GLib.List.free()'d
         #print('services: ' + str(proxy.list_services()))    # Should be GLib.free()'d and list should also be GLib.List.free()'d
