@@ -232,17 +232,21 @@ class UpnpDevice:
 class UpnpDeviceDatabase:
     """Bonjour service database"""
     
-    def __init__(self, interface, resolve_mac = False, use_sudo_for_arping = True):
+    def __init__(self, interface, resolve_mac = False, use_sudo_for_arping = True, db_add_event = None, db_del_event = None):
         """Initialise an empty UpnpDeviceDatabase
         
         \param interface The network interface on which devices are discovered
         \param resolve_mac If True, we will also resolve each entry to store the MAC address of the device together with its IP address
         \param use_sudo_for_arping Use sudo when calling arping (only used if resolve_mac is True)
+        \param db_add_event If not None, we will invoke this threading.Event()'s set() method for every device added to the database
+        \param db_del_event If not None, we will invoke this threading.Event()'s set() method for every device removed from the database
         """
         self.interface = interface
         self._database = {}
         self.resolve_mac = resolve_mac
         self.use_sudo_for_arping = use_sudo_for_arping
+        self._db_add_event = db_add_event
+        self._db_del_event = db_del_event
 
     def __repr__(self):
         temp = ''
@@ -368,6 +372,9 @@ value:%s
         msg += ' to internal db'
         logger.debug(msg)
         self._database[key] = upnp_device
+        
+        if self._db_add_event is not None:  # If there is an event to set when devices are added to the DB, do it
+            self._db_add_event.set()
             
         #print('service_types: ' + str(proxy.list_service_types()))    # Should be GLib.free()'d and list should also be GLib.List.free()'d
         #print('services: ' + str(proxy.list_services()))    # Should be GLib.free()'d and list should also be GLib.List.free()'d
@@ -426,6 +433,9 @@ value:%s
         logger.debug('Removing entry ' + str(key) + ' from database')
         if key in self._database.keys():
             del self._database[key]
+            if self._db_del_event is not None:  # If there is an event to set when devices are removed from the DB, do it
+                self._db_del_event.set()
+
 
     def reset(self):
         """\brief Empty the database"""
@@ -473,49 +483,49 @@ value:%s
 #                 if mac_normalise(bonjour_service.mac_address) == mac_normalise(mac_address):
 #                     logger.debug('Removing non-required MAC address "' + mac_address + "' from database")
 #                     del self._database[key]
-#     
-#     def export_to_tuple_list(self):
-#         """\brief Export this database to a list of tuples (so that it can be processed by RobotFramework keywords)
-#         
-#         \return A list of tuples containing (interface, protocol, name, stype, domain, hostname, ip_address, sport, txt, flags, mac_address)
-#         """
-#         export = []
-#         try:
-#             records = self._database.iteritems()
-#         except AttributeError:
-#             records = self._database.items()
-#         
-#         for (key, bonjour_service) in records:
-#             (interface_osname, protocol, name, stype, domain) = key
-#             if bonjour_service:
-#                 hostname = bonjour_service.hostname
-#                 ip_address = bonjour_service.ip_address
-#                 port = bonjour_service.port
-#                 txt = bonjour_service.txt
-#                 flags = bonjour_service.flags
-#                 mac_address = bonjour_service.mac_address
-#             else:
-#                 logger.warning('Exporting a non resolved entry for service "' + str(name) + '" of type ' + str(stype))
-#                 hostname = None
-#                 ip_address = None
-#                 port = None
-#                 txt = None
-#                 flags = None
-#                 mac_address = None
-#             export += [(interface_osname, protocol, name, stype, domain, hostname, ip_address, port, txt, flags, mac_address)]
-#         
-#         return export
-#         
-#     def import_from_tuple(self, tuple):
-#         """\brief Import a record into this database from a tuples
-#         
-#         \param tuple A tuple containing (interface, protocol, name, stype, domain, hostname, ip_address, sport, txt, flags, mac_address), as exported into a list using export_to_tuple_list() for example 
-#         """
-#         (interface_osname, protocol, name, stype, domain, hostname, ip_address, port, txt, flags, mac_address) = tuple
-#         key = (interface_osname, protocol, name, stype, domain)
-#         bonjour_service = BonjourService(hostname, ip_address, port, txt, flags)
-#         self.add(key, bonjour_service)
-# 
+    
+    def export_to_tuple_list(self):
+        """\brief Export this database to a list of tuples (so that it can be processed by RobotFramework keywords)
+         
+        \return A list of tuples containing (interface, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)
+        """
+        export = []
+        try:
+            records = self._database.iteritems()
+        except AttributeError:
+            records = self._database.items()
+         
+        for (key, upnp_device) in records:
+            (interface_osname, protocol, udn) = key
+            if upnp_device:
+                hostname = upnp_device.hostname
+                port = upnp_device.port
+                device_type = upnp_device.device_type
+                friendly_name = upnp_device.friendly_name
+                location = upnp_device.location
+                manufacturer = upnp_device.manufacturer
+                manufacturer_url = upnp_device.manufacturer_url
+                model_description = upnp_device.model_description
+                model_name = upnp_device.model_name
+                model_number = upnp_device.model_number
+                model_url = upnp_device.model_url
+                presentation_url = upnp_device.presentation_url
+                serial_number = upnp_device.serial_number
+                mac_address = upnp_device.mac_address
+                export += [(interface_osname, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)]
+         
+        return export
+         
+    def import_from_tuple(self, tuple):
+        """\brief Import a record into this database from a tuples
+         
+        \param tuple A tuple containing (interface, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address), as exported into a list using export_to_tuple_list() for example 
+        """
+        (interface_osname, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address) = tuple
+        key = (interface_osname, protocol, udn)
+        upnp_device = UpnpDevice(hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)
+        self.add(key, upnp_device)
+    
 #     def is_ip_address_in_db(self, ip_address):
 #         try:
 #             records = self._database.iteritems()
@@ -618,6 +628,8 @@ class UpnpLibrary:
     def __init__(self, use_sudo_for_arping=True):
         self._service_database = None
         self._service_database_mutex = threading.Lock()    # This mutex protects writes to the _service_database attribute
+        self._service_database_added_event = threading.Event()    # This event is set when a device is added to the database
+        self._service_database_deleted_event = threading.Event()    # This event is set when a device is added to the database
         self._use_sudo_for_arping = use_sudo_for_arping
 
     def get_services(self, device_type = 'upnp:rootdevice', interface_name = None, ip_type = None, resolve_ip = True):
@@ -625,7 +637,12 @@ class UpnpLibrary:
         """
         
         with self._service_database_mutex:
-            self._service_database = UpnpDeviceDatabase(interface = interface_name, resolve_mac = resolve_ip, use_sudo_for_arping = self._use_sudo_for_arping)
+            self._service_database = UpnpDeviceDatabase(interface = interface_name,
+                                                        resolve_mac = resolve_ip,
+                                                        use_sudo_for_arping = self._use_sudo_for_arping,
+                                                        db_add_event = self._service_database_added_event,
+                                                        db_del_event = self._service_database_deleted_event
+                                                        )
         
 #         if service_type and service_type != '*':
 #             service_type_arg = service_type
@@ -654,13 +671,41 @@ class UpnpLibrary:
 
         cp = GUPnP.ControlPoint.new(ctx, device_type)
         cp.set_active(True)
-        cp.connect("device-proxy-available", self._service_database.device_available)
-        cp.connect("device-proxy-unavailable", self._service_database.device_unavailable)
-        cp.connect("service-proxy-available", self._service_database.service_available)
-        cp.connect("service-proxy-unavailable", self._service_database.service_unavailable)
+        id1 = cp.connect("device-proxy-available", self._service_database.device_available)
+        id2 = cp.connect("device-proxy-unavailable", self._service_database.device_unavailable)
+        id3 = cp.connect("service-proxy-available", self._service_database.service_available)
+        id4 = cp.connect("service-proxy-unavailable", self._service_database.service_unavailable)
         print('Going to run mainloop forever')
-        GLib.MainLoop().run()
-        print('Finishing mainloop')
+        _mainloop = GLib.MainLoop()
+        
+        def _quit_dbus_when_discovery_done():
+            """This method will notify that we assume database construction is finished
+            """
+            logger.debug('Waiting for event')
+            while self._service_database_added_event.wait(5):
+                logger.debug('Got add event... resetting timer')
+                self._service_database_added_event.clear()  # Reset the flag we are watching... let the DB notify us when changes are made
+            
+            _mainloop.quit()
+
+        _dbus_stop_loop_thread = threading.Thread(target = _quit_dbus_when_discovery_done)    # Start a background thread that will stop the mainloop below when no new discovery occurs
+        _dbus_stop_loop_thread.setDaemon(True)    # D-Bus loop should be forced to terminate when main program exits
+        _dbus_stop_loop_thread.start()
+
+        _mainloop.run()
+        logger.debug('Mainloop has terminated')
+        
+        cp.disconnect(id1)
+        cp.disconnect(id2)
+        cp.disconnect(id3)
+        cp.disconnect(id4)
+        cp.set_active(False)
+        
+        logger.debug('Control point is now inactive')
+        
+        with self._service_database_mutex:
+            logger.debug('Services found: ' + str(self._service_database))
+            return self._service_database.export_to_tuple_list()
 
 #     def get_ip(self, mac):
 #         """ Get first IP address which have `mac` in UUID.
