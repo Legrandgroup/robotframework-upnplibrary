@@ -7,6 +7,11 @@ from __future__ import print_function
 from gi.repository import GLib, GUPnP
 from gi.repository import GSSDP
 
+import re
+import os
+
+import subprocess
+
 import threading
 
 def guess_ip_version(ip_string):
@@ -26,13 +31,147 @@ def guess_ip_version(ip_string):
     
     if socket.has_ipv6:
         try:
-            ipv4_buffer = socket.inet_pton(socket.AF_INET, ip_string)
+            ipv6_buffer = socket.inet_pton(socket.AF_INET, ip_string)
             return 6
         except socket.error:
             pass
     
     return 0
+
+# The pythonic-version of arping below (using python scapy) is commented out because it cannot gain superuser rights via sudo, we should thus be root
+# This would however be more platform-independent... instead, we run the arping command (via sudo) and parse its output
+# import scapy.all
+# def arping(iprange):
+#     """Arping function takes IP Address or Network, returns nested mac/ip list"""
+# 
+#     scapy.all.conf.verb=0
+#     ans,unans = scapy.all.srp(scapy.all.Ether(dst="ff:ff:ff:ff:ff:ff")/scapy.all.ARP(pdst=iprange), timeout=2)
+# 
+#     collection = []
+#     for snd, rcv in ans:
+#         result = rcv.sprintf(r"%scapy.all.ARP.psrc% %scapy.all.Ether.src%").split()
+#         collection.append(result)
+#     return collection
+
+"""Global variable required for function arping() below"""
+arping_supports_r_i = True
+
+def arping(ip_address, interface=None, use_sudo = True):
+    """Run arping and returns a list of MAC addresses matching with the IP address provided in \p ip_address (or an empty list if there was no reply)
     
+    \param ip_address The IPv4 to probe
+    \param interface A network interface on which to probe (or None if we should check all network interfaces)
+    \param use_sudo Use sudo to run the arping command (set this to True if privilege elevation is required)
+    
+    \return A list of MAC addresses matching with \p ip_address. Beware that this can be empty or even contain more than one entry
+    """
+    
+    global arping_supports_r_i
+    
+    if guess_ip_version(str(ip_address)) != 4: # We have an IPv4 address
+        logger.error('Arping: bad IPv4 format: ' + str(ip_address))
+        raise Exception('BadIPv4Format')
+    
+    if use_sudo:
+        arping_cmd_prefix = ['sudo']
+    else:
+        arping_cmd_prefix = []
+    
+    arping_cmd_prefix += ['arping', '-c', '1']
+    
+    if arping_supports_r_i:
+        arping_cmd = arping_cmd_prefix + ['-r']
+        if not interface is None:
+            arping_cmd += ['-i', str(interface)]
+        arping_cmd += [str(ip_address)]
+        proc = subprocess.Popen(arping_cmd, stdout=subprocess.PIPE, stderr=open(os.devnull, 'wb'))  # Hide stderr since we may expect errors if we use the wrong args (depending on the arping version we are using)
+        result=[]
+        for line in iter(proc.stdout.readline,''):
+            result+=[line.rstrip()]
+
+        exitvalue = proc.wait()
+        if exitvalue == 0:
+            return result
+        else:
+            arping_supports_r_i = False
+    
+    # Some versions of arping coming from the iproute package do not support -r and use -I instead of -i
+    if not arping_supports_r_i:
+        arping_cmd = arping_cmd_prefix  # Reset the command line that we started to build above
+        if not interface is None:
+            arping_cmd += ['-I', str(interface)]
+        arping_cmd += [str(ip_address)]
+        #print(arping_cmd)
+        proc = subprocess.Popen(arping_cmd, stdout=subprocess.PIPE, stderr=open(os.devnull, 'wb'))  # We also hide stderr here because sudo may complain when it cannot resolve the local machine's hostname
+        result=[]
+        arping_header_regexp = re.compile(r'^ARPING')
+        arp_reply_template1_regexp = re.compile(r'^.*from\s+([0-9]+\.[0-9]+\.[0-9]+.[0-9]+)\s+\[([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2})\]')
+        arp_reply_template2_regexp = re.compile(r'^.*from\s+([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2})\s+[(]([0-9]+\.[0-9]+\.[0-9]+.[0-9]+)[)]')
+        arping_ip_addr = None
+        arping_mac_addr = None
+        for line in iter(proc.stdout.readline,''):
+            line = line.rstrip()
+            #print('arping:"' + str(line) + '"')
+            if not re.match(arping_header_regexp, line):    # Skip the header from arping
+                match = re.match(arp_reply_template1_regexp, line)
+                if match:
+                    arping_ip_addr = match.group(1)
+                    arping_mac_addr = match.group(2)
+                    break
+                match = re.match(arp_reply_template2_regexp, line)
+                if match:
+                    arping_ip_addr = match.group(2)
+                    arping_mac_addr = match.group(1)
+                    break
+            
+        if not arping_mac_addr is None:
+            if not arping_ip_addr is None:
+                if arping_ip_addr != str(ip_address):
+                    logger.warning('Got a mismatch on IP address reply from arping: Expected ' + str(ip_address) + ', got ' + arping_ip_addr)
+            result+=[arping_mac_addr]
+        
+        exitvalue = proc.wait()
+        if exitvalue == 0:
+            return result
+        else:
+            arping_supports_r_i = True  # If we fail here, maybe a previous failure (that lead us to this arping does not support -r -i) was wrong... just reset our global arping guess
+            raise Exception('ArpingSubprocessFailed')
+
+def mac_normalise(mac, unix_format=True):
+    """\brief Convert many notation of a MAC address to to a uniform representation
+    
+    \param mac The MAC address as a string
+    
+    \param unix_format If set to true, use the UNIX representation, so would output: 01:23:45:67:89:ab
+    
+    Example: mac_normalise('01.23.45.67.89.ab') == mac_normalise('01:23:45:67:89:ab') == mac_normalise('01-23-45-67-89-ab') == mac_normalise('0123456789ab') == '0123456789ab'
+    mac_normalise('01.23.45.67.89.ab') == '01:23:45:67:89:ab'
+    """
+
+    ret = ''
+    mac = str(mac)
+    mac = mac.lower()
+    mac = mac.strip()
+    re_mac_one = re.compile(r'^(\w{2})[:|\-](\w{2})[:|\-](\w{2})[:|\-](\w{2})[:|\-](\w{2})[:|\-](\w{2})$')
+    re_mac_two = re.compile(r'^(\w{4})\.(\w{4})\.(\w{4})$')
+    re_mac_three = re.compile(r'^(\w{12})$')
+    one = re.match(re_mac_one, mac)
+    two = re.match(re_mac_two, mac)
+    tree = re.match(re_mac_three, mac)
+    if one:
+        select = one.groups()
+    elif two:
+        select = two.groups()
+    elif tree:
+        select = tree.groups()
+    else:
+        raise Exception('InvalidMACFormat:' + str(mac))
+    if unix_format:
+        delim=':'
+    else:
+        delim=''
+    return delim.join(select)
+ 
 class UpnpDevice:
     
     """Description of an UPnP device (this is a data container without any method (the equivalent of a C-struct))"""
@@ -93,12 +232,14 @@ class UpnpDevice:
 class UpnpDeviceDatabase:
     """Bonjour service database"""
     
-    def __init__(self, resolve_mac = False, use_sudo_for_arping = True):
+    def __init__(self, interface, resolve_mac = False, use_sudo_for_arping = True):
         """Initialise an empty UpnpDeviceDatabase
         
+        \param interface The network interface on which devices are discovered
         \param resolve_mac If True, we will also resolve each entry to store the MAC address of the device together with its IP address
         \param use_sudo_for_arping Use sudo when calling arping (only used if resolve_mac is True)
         """
+        self.interface = interface
         self._database = {}
         self.resolve_mac = resolve_mac
         self.use_sudo_for_arping = use_sudo_for_arping
@@ -179,6 +320,8 @@ value:%s
         else:
             protocol = None
         
+        interface_osname = self.interface
+        
         udn = proxy.get_udn()
 
         print('device_available(): Got device with hostname=' + str(purl_hostname) + ', port=' + str(purl_port))
@@ -202,8 +345,7 @@ value:%s
             upnp_device.mac_address = None
             if protocol == 'ipv4':
                 try:
-                    #mac_address_list = arping(bonjour_service.ip_address, interface=interface_osname, use_sudo=self.use_sudo_for_arping)
-                    mac_address_list=[]
+                    mac_address_list = arping(upnp_device.hostname, interface=interface_osname, use_sudo=self.use_sudo_for_arping)
                     if len(mac_address_list) != 0:
                         if len(mac_address_list) > 1:  # More than one MAC address... issue a warning
                             logger.warning('Got more than one MAC address for IP address ' + str(upnp_device.ip_address) + ': ' + str(mac_address_list) + '. Using first')
@@ -217,7 +359,7 @@ value:%s
             else:
                 logger.warning('Cannot resolve IPv6 ' + upnp_device.ip_address + ' to MAC address (function not implemented yet)')
 
-        key = udn
+        key = (interface_osname, protocol, udn)
         
         msg = 'Adding '
         msg += 'service ' + str(key)
@@ -242,6 +384,16 @@ value:%s
         presentation_url = proxy.get_presentation_url()
         (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
 
+        ip_version = guess_ip_version(purl_hostname)
+        if ip_version == 4:
+            protocol = 'ipv4'
+        elif ip_version == 6:
+            protocol = 'ipv6'
+        else:
+            protocol = None
+        
+        interface_osname = self.interface
+
         udn = proxy.get_udn()
 
         print('device_unavailable(): Got device with hostname=' + str(purl_hostname) + ', port=' + str(purl_port))
@@ -261,7 +413,7 @@ value:%s
                                  proxy.get_serial_number(),
                                  mac_address = None)
 
-        key = udn
+        key = (interface_osname, protocol, udn)
         
         msg = 'Should remove '
         msg += 'service ' + str(key)
@@ -473,7 +625,7 @@ class UpnpLibrary:
         """
         
         with self._service_database_mutex:
-            self._service_database = self._service_database = UpnpDeviceDatabase(resolve_mac = resolve_ip, use_sudo_for_arping = self._use_sudo_for_arping)
+            self._service_database = UpnpDeviceDatabase(interface = interface_name, resolve_mac = resolve_ip, use_sudo_for_arping = self._use_sudo_for_arping)
         
 #         if service_type and service_type != '*':
 #             service_type_arg = service_type
