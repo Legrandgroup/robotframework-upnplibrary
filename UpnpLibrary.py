@@ -9,6 +9,30 @@ from gi.repository import GSSDP
 
 import threading
 
+def guess_ip_version(ip_string):
+    """ Guess the version of an IP address, check its validity
+    \param ip_string A string containing an IP address
+    
+    \return The version of the IP protocol used (int(4) for IPv4 or int(6) for IPv6, int(0) otherwise) 
+    """
+    
+    import socket
+    
+    try:
+        ipv4_buffer = socket.inet_pton(socket.AF_INET, ip_string)
+        return 4
+    except socket.error:
+        pass
+    
+    if socket.has_ipv6:
+        try:
+            ipv4_buffer = socket.inet_pton(socket.AF_INET, ip_string)
+            return 6
+        except socket.error:
+            pass
+    
+    return 0
+    
 class UpnpDevice:
     
     """Description of an UPnP device (this is a data container without any method (the equivalent of a C-struct))"""
@@ -147,6 +171,14 @@ value:%s
         presentation_url = proxy.get_presentation_url()
         (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
         
+        ip_version = guess_ip_version(purl_hostname)
+        if ip_version == 4:
+            protocol = 'ipv4'
+        elif ip_version == 6:
+            protocol = 'ipv6'
+        else:
+            protocol = None
+        
         udn = proxy.get_udn()
 
         print('device_available(): Got device with hostname=' + str(purl_hostname) + ', port=' + str(purl_port))
@@ -166,24 +198,24 @@ value:%s
                                  proxy.get_serial_number(),
                                  mac_address = None)
 
-#         if self.resolve_mac and not upnp_device is None:
-#             upnp_device.mac_address = None
-#             if protocol == 'ipv4':
-#                 try:
-#                     mac_address_list = arping(bonjour_service.ip_address, interface=interface_osname, use_sudo=self.use_sudo_for_arping)
-#                     if len(mac_address_list) != 0:
-#                         if len(mac_address_list) > 1:  # More than one MAC address... issue a warning
-#                             logger.warning('Got more than one MAC address for IP address ' + str(bonjour_service.ip_address) + ': ' + str(mac_address_list) + '. Using first')
-#                         bonjour_service.mac_address = mac_address_list[0]
-#                 except Exception as e:
-#                     if e.message != 'ArpingSubprocessFailed':   # If we got an exception related to anything else than arping subprocess...
-#                         raise   # Raise the exception
-#                     else:
-#                         logger.warning('Arping failed for IP address ' + str(bonjour_service.ip_address) + '. Continuing anyway but MAC address will remain set to None')
-#                         # Otherwise, we will just not resolve the IP address into a MAC... too bad, but maybe not that blocking
-#                         # Note: this always happens when avahi-browse was launched without -l (in that cas, it might report local services, but the local IP address will not be resolved by arping as there is noone (else than us) to reply on the network interface 
-#             else:
-#                 logger.warning('Cannot resolve IPv6 ' + bonjour_service.ip_address + ' to MAC address (function not implemented yet)')
+        if self.resolve_mac and not upnp_device is None:
+            upnp_device.mac_address = None
+            if protocol == 'ipv4':
+                try:
+                    #mac_address_list = arping(bonjour_service.ip_address, interface=interface_osname, use_sudo=self.use_sudo_for_arping)
+                    mac_address_list=[]
+                    if len(mac_address_list) != 0:
+                        if len(mac_address_list) > 1:  # More than one MAC address... issue a warning
+                            logger.warning('Got more than one MAC address for IP address ' + str(upnp_device.ip_address) + ': ' + str(mac_address_list) + '. Using first')
+                        upnp_device.mac_address = mac_address_list[0]
+                except Exception as e:
+                    if e.message != 'ArpingSubprocessFailed':   # If we got an exception related to anything else than arping subprocess...
+                        raise   # Raise the exception
+                    else:
+                        logger.warning('Arping failed for IP address ' + str(upnp_device.ip_address) + '. Continuing anyway but MAC address will remain set to None')
+                        # Otherwise, we will just not resolve the IP address into a MAC... too bad, but maybe not that blocking
+            else:
+                logger.warning('Cannot resolve IPv6 ' + upnp_device.ip_address + ' to MAC address (function not implemented yet)')
 
         key = udn
         
