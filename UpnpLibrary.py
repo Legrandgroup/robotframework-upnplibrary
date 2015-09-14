@@ -55,14 +55,14 @@ class UpnpDevice:
         if not self.mac_address is None:
             result += ',MAC=' + str(self.mac_address) + ')'
         if not self.location is None:
-            result += ',LOCATION=' + str(self.location)
+            result += ',LOCATION="' + str(self.location) + '"'
         if not self.presentation_url is None:
-            result += ',URL=' + str(self.presentation_url)
+            result += ',URL="' + str(self.presentation_url) + '"'
         if self.model_description:
-            result += ',MODEL=[' + str(self.model_description)
+            result += ',MODEL="' + str(self.model_description)
             if self.model_name:
                 result += '(' + str(self.model_name) + ')'
-            result += ']'
+            result += '"'
         result += ']'
         return result
     
@@ -93,6 +93,49 @@ value:%s
 ''' % (key, value)
         return temp
 
+    def _upnp_purl_to_details(self, presentation_url):
+        """Convert a presentation URL to a tuple of protocol, hostname, port, path
+        \param presentation_url
+        
+        \return A tuple containing (protocol, hostname, port, path). Any (and possibly all) elements can be None if parsing failed
+        """
+        purl_proto = None
+        purl_hostname = None
+        purl_port = None
+        purl_path = None
+        purl_array_proto = presentation_url.split('//')
+        if len(purl_array_proto)>1:   # Split did find '//'
+            purl_proto = purl_array_proto[0].rstrip(':').lower()
+            presentation_url = purl_array_proto[1]
+
+        try:
+            purl_path_sep_index = presentation_url.index('/')
+            purl_path = presentation_url[purl_path_sep_index+1:]
+            presentation_url = presentation_url[:purl_path_sep_index]
+        except ValueError:
+            pass
+        
+        try:
+            purl_port_sep_index = presentation_url.index(':')
+            purl_hostname = presentation_url[:purl_port_sep_index]
+            purl_port = presentation_url[purl_port_sep_index+1:]
+        except ValueError:
+            # Not ':' found
+            purl_hostname = presentation_url
+            purl_port = None
+        
+        if purl_proto is None:  # Assume HTTP be default for URLs
+            purl_proto = 'http'
+        
+        if purl_port is None:   # Handle default ports if we know them
+            if purl_proto == 'http':
+                purl_port = 80
+            elif purl_proto == 'https':
+                purl_port = 443
+        
+        return (purl_proto, purl_hostname, purl_port, purl_path)
+        
+        
     def device_available(self, cp, proxy):
         """Add one UPnP device in database
         
@@ -102,33 +145,11 @@ value:%s
         # See http://lazka.github.io/pgi-docs/#GUPnP-1.0/classes/DeviceInfo.html#gupnp-deviceinfo-methods
         #print('Entering device_available() with args: [' + str(cp) + ' ,' + str(proxy) + ']')
         presentation_url = proxy.get_presentation_url()
+        (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
+        
         udn = proxy.get_udn()
-        
-        purl = presentation_url
-        purl_hostname = None
-        purl_port = None
-        purl_array_proto = purl.split('//')
-        if len(purl_array_proto)>1:   # Split did find '//'
-            purl_proto = purl_array_proto[0].rstrip(':')
-            purl = purl_array_proto[1]
 
-        try:
-            purl_path_sep_index = purl.index('/')
-            purl_path = purl[purl_path_sep_index+1:]
-            purl = purl[:purl_path_sep_index]
-        except ValueError:
-            pass
-        
-        try:
-            purl_port_sep_index = purl.index(':')
-            purl_hostname = purl[:purl_port_sep_index]
-            purl_port = purl[purl_port_sep_index+1:]
-        except ValueError:
-            # Not ':' found
-            purl_hostname = purl
-            purl_port = None
-
-        print('Got device with hostname=' + purl_hostname + ', port=' + purl_port)
+        print('device_available(): Got device with hostname=' + str(purl_hostname) + ', port=' + str(purl_port))
 
         upnp_device = UpnpDevice(purl_hostname,
                                  purl_port,
@@ -178,17 +199,49 @@ value:%s
         #print('services: ' + str(proxy.list_services()))    # Should be GLib.free()'d and list should also be GLib.List.free()'d
         
 
-    def device_unavailable(self, *kwargs):
-        """Remove one Bonjour service in database
+    def device_unavailable(self, cp, proxy):
+        """Remove one UPnP device in database
         
-        \param key A tuple containing (interface, protocol, name, stype, domain), which is the key of the record to delete from the database 
+        \param cp A GUPnP.ControlPoint object that caught the new device event
+        \param proxy An instance of GUPnP.DeviceProxy to get information about this device
         """
-        print('Entering device_unavailable() with args: ' + str(kwargs))
+        # See http://lazka.github.io/pgi-docs/#GUPnP-1.0/classes/DeviceInfo.html#gupnp-deviceinfo-methods
+        #print('Entering device_unavailable() with args: [' + str(cp) + ' ,' + str(proxy) + ']')
+        presentation_url = proxy.get_presentation_url()
+        (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
+
+        udn = proxy.get_udn()
+
+        print('device_unavailable(): Got device with hostname=' + str(purl_hostname) + ', port=' + str(purl_port))
+
+        upnp_device = UpnpDevice(purl_hostname,
+                                 purl_port,
+                                 proxy.get_device_type(),
+                                 proxy.get_friendly_name(),
+                                 proxy.get_location(),
+                                 proxy.get_manufacturer(),
+                                 proxy.get_manufacturer_url(),
+                                 proxy.get_model_description(),
+                                 proxy.get_model_name(),
+                                 proxy.get_model_number(),
+                                 proxy.get_model_url(),
+                                 presentation_url,
+                                 proxy.get_serial_number(),
+                                 mac_address = None)
+
+        key = udn
+        
+        msg = 'Should remove '
+        msg += 'service ' + str(key)
+        if not upnp_device is None:
+            msg += ' with details ' + str(upnp_device)
+        msg += ' to internal db'
+        logger.debug(msg)
         
 
-        #logger.debug('Removing entry ' + str(key) + ' from database')
-        #if key in self._database.keys():
-        #    del self._database[key]
+        logger.debug('Removing entry ' + str(key) + ' from database')
+        if key in self._database.keys():
+            del self._database[key]
 
     def reset(self):
         """\brief Empty the database"""
