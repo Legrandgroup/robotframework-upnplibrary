@@ -2,12 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division
-from __future__ import print_function
-
-from gi.repository import GLib, GUPnP
-from gi.repository import GSSDP
 
 import re
+import sys
 import os
 
 import subprocess
@@ -171,7 +168,136 @@ def mac_normalise(mac, unix_format=True):
     else:
         delim=''
     return delim.join(select)
- 
+
+class UpnpBrowseDeviceEvent:
+    
+    """Class representing a device browse event (as output by script UpnpBrowse.py)"""
+    
+    def __init__(self, entry_array):
+        """\brief Class constructor
+        
+        \param entry_array One line of output as provided by UpnpBrowse, formatted as a list of UTF-8 encoded strings
+        
+        This method will raise exceptions if the entry_array cannot be parsed correctly, otherwise the UpnpBrowseDeviceEvent will be constructed properly.
+        
+        The properties that are populated inside this class are:
+        self.interface The network interface on which the device has been discovered (following the OS notation, eg: 'eth0')
+        self.udn The UDN of the UPnP device (unique ID)
+        self.friendly_name
+        self.location
+        self.manufacturer
+        self.manufacturer_url
+        self.model_description
+        self.model_name
+        self.model_number
+        self.model_url
+        self.presentation_url
+        self.serial_number
+        """
+        
+        if entry_array is None:
+            raise Exception('InvalidEntry')
+        type = entry_array[0]
+        self._input = entry_array
+        if ((type == '+' or type == '-') and len(entry_array) != 6):
+            raise Exception('InvalidEntry')
+        self.interface = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[1])
+        if not self.interface:
+            raise Exception('InvalidEntry')
+        self.udn = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[2])
+        if not self.udn:
+            raise Exception('InvalidEntry')
+        self.friendly_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[3])
+        if not self.friendly_name:
+            self.friendly_name = None
+        self.location = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[4])
+        if not self.location:
+            self.location = None
+        self.manufacturer = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[5])
+        if not self.manufacturer:
+            self.manufacturer = None
+        self.manufacturer_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[6])
+        if not self.manufacturer_url:
+            self.manufacturer_url = None
+        self.model_description = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[7])
+        if not self.model_name:
+            self.model_name = None
+        self.model_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[8])
+        if not self.model_number:
+            self.model_number = None
+        self.model_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[9])
+        if not self.model_url:
+            self.model_url = None
+        self.model_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[10])
+        if not self.model_url:
+            self.model_url = None
+        self.presentation_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[11])
+        if not self.presentation_url:
+            self.presentation_url = None
+        self.serial_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[12])
+        if not self.serial_number:
+            self.serial_number = None
+
+        self.txt_missing_end = False
+    
+    def continued_on_next_line(self):
+        """\brief Are there more lines required to fill-in this device description
+        
+        \return True if there are more lines required to fill-in this device description. In such case, the additional lines can be provided by subsequent calls to method add_line() below
+        """
+        return self.txt_missing_end
+        
+    def add_line(self, line):
+        """\brief Provided additional lines to fill-in this service description. This is not supported because UpnpBrowser's output never span multiple lines, but it is kept here for homogeneous interface with the Robotframework BonjourLibrary
+        
+        \param line A new line to process, encoded as UTF-8 (without the terminating carriage return)
+        """
+        raise Exception('ExtraInputLine')
+    
+    @staticmethod
+    def unescape_avahibrowse_string(input):
+        """\brief Unescape all escaped characters in string \p input
+        
+        \param input String to unescape
+        
+        \return The unescaped string (avahi-browse escaped bytes will lead to an UTF-8 encoded returned string)
+        """
+        output = ''
+        espace_pos = input.find('\\')
+        while espace_pos != -1:
+            new_chunk = input[espace_pos+1:]
+            output += input[:espace_pos]
+            #print(output + '==>' + new_chunk)
+            try:
+                escaped_char = int(new_chunk[0]) * 100 + int(new_chunk[1]) * 10 + int(new_chunk[2])    # Fetch 3 following digits and convert them to a decimal value
+                output += chr(escaped_char)    # Append escaped character to output (note: if escaped_char is not a byte (>255 for example), an exception will be raised here
+                new_chunk = new_chunk[3:]    # Skip the 3 characters that make the escaped ASCII value
+            except:
+                output += '\\'    # This was not an escaped character... re-insert the '\'
+            
+            input = new_chunk
+            espace_pos = input.find('\\')
+        
+        output += input
+        return output
+    
+    def __repr__(self):
+        if self.event == 'add':
+            output = '+'
+        elif self.event == 'update':
+            output = '!'
+        elif self.event == 'del':
+            output = '-'
+        else:
+            output = '?'
+        output += '[if=' + str(self.interface) + ']: "' + str(self.udn) + '"'
+        if self.presentation_url:
+            output += ' '+ str(self.presentation_url)
+        if self.friendly_name:
+            output += '(' + str(self.friendly_name)
+            output += ')'
+        return output
+
 class UpnpDevice:
     
     """Description of an UPnP device (this is a data container without any method (the equivalent of a C-struct))"""
@@ -230,23 +356,17 @@ class UpnpDevice:
         return result
     
 class UpnpDeviceDatabase:
-    """Bonjour service database"""
+    """UPnP service database"""
     
-    def __init__(self, interface, resolve_mac = False, use_sudo_for_arping = True, db_add_event = None, db_del_event = None):
+    def __init__(self, resolve_mac = False, use_sudo_for_arping = True):
         """Initialise an empty UpnpDeviceDatabase
         
-        \param interface The network interface on which devices are discovered
         \param resolve_mac If True, we will also resolve each entry to store the MAC address of the device together with its IP address
         \param use_sudo_for_arping Use sudo when calling arping (only used if resolve_mac is True)
-        \param db_add_event If not None, we will invoke this threading.Event()'s set() method for every device added to the database
-        \param db_del_event If not None, we will invoke this threading.Event()'s set() method for every device removed from the database
         """
-        self.interface = interface
         self._database = {}
         self.resolve_mac = resolve_mac
         self.use_sudo_for_arping = use_sudo_for_arping
-        self._db_add_event = db_add_event
-        self._db_del_event = db_del_event
 
     def __repr__(self):
         temp = ''
@@ -304,94 +424,58 @@ value:%s
         
         return (purl_proto, purl_hostname, purl_port, purl_path)
         
-        
-    def device_available(self, cp, proxy):
+    def add(self, key, upnp_device):
         """Add one UPnP device in database
         
-        \param cp A GUPnP.ControlPoint object that caught the new device event
-        \param proxy An instance of GUPnP.DeviceProxy to get information about this device
+        \param key A tuple containing the description of the UPnP device (interface, protocol, udn) (note that interface is a string containing the interface name following the OS designation)
+        \param upnp_device An instance of UpnpDevice to add in the database for this \p key
         """
-        # See http://lazka.github.io/pgi-docs/#GUPnP-1.0/classes/DeviceInfo.html#gupnp-deviceinfo-methods
-        #print('Entering device_available() with args: [' + str(cp) + ' ,' + str(proxy) + ']')
-        presentation_url = proxy.get_presentation_url()
-        (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
         
-        ip_version = guess_ip_version(purl_hostname)
-        if ip_version == 4:
-            protocol = 'ipv4'
-        elif ip_version == 6:
-            protocol = 'ipv6'
-        else:
-            protocol = None
-        
-        interface_osname = self.interface
-        
-        udn = proxy.get_udn()
-
-        print('device_available(): Got device with hostname=' + str(purl_hostname) + ', port=' + str(purl_port))
-
-        upnp_device = UpnpDevice(purl_hostname,
-                                 purl_port,
-                                 proxy.get_device_type(),
-                                 proxy.get_friendly_name(),
-                                 proxy.get_location(),
-                                 proxy.get_manufacturer(),
-                                 proxy.get_manufacturer_url(),
-                                 proxy.get_model_description(),
-                                 proxy.get_model_name(),
-                                 proxy.get_model_number(),
-                                 proxy.get_model_url(),
-                                 presentation_url,
-                                 proxy.get_serial_number(),
-                                 mac_address = None)
-
+        (interface_osname, protocol, udn) = key
+        msg = 'Adding device ' + str(key) + ' with details ' + str(upnp_device) + ' to internal db'
+        logger.debug(msg)
         if self.resolve_mac and not upnp_device is None:
             upnp_device.mac_address = None
             if protocol == 'ipv4':
                 try:
-                    mac_address_list = arping(upnp_device.hostname, interface=interface_osname, use_sudo=self.use_sudo_for_arping)
+                    mac_address_list = arping(upnp_device.hostname, upnp_device.interface, use_sudo=self.use_sudo_for_arping)
                     if len(mac_address_list) != 0:
                         if len(mac_address_list) > 1:  # More than one MAC address... issue a warning
-                            logger.warning('Got more than one MAC address for IP address ' + str(upnp_device.ip_address) + ': ' + str(mac_address_list) + '. Using first')
+                            logger.warning('Got more than one MAC address for host ' + str(upnp_device.hostname) + ': ' + str(mac_address_list) + '. Using first')
                         upnp_device.mac_address = mac_address_list[0]
                 except Exception as e:
                     if e.message != 'ArpingSubprocessFailed':   # If we got an exception related to anything else than arping subprocess...
                         raise   # Raise the exception
                     else:
-                        logger.warning('Arping failed for IP address ' + str(upnp_device.ip_address) + '. Continuing anyway but MAC address will remain set to None')
+                        logger.warning('Arping failed for IP address ' + str(upnp_device.hostname) + '. Continuing anyway but MAC address will remain set to None')
                         # Otherwise, we will just not resolve the IP address into a MAC... too bad, but maybe not that blocking
             else:
-                logger.warning('Cannot resolve IPv6 ' + upnp_device.ip_address + ' to MAC address (function not implemented yet)')
-
-        key = (interface_osname, protocol, udn)
-        
-        msg = 'Adding '
-        msg += 'service ' + str(key)
-        if not upnp_device is None:
-            msg += ' with details ' + str(upnp_device)
-        msg += ' to internal db'
-        logger.debug(msg)
-        self._database[key] = upnp_device
-        
-        if self._db_add_event is not None:  # If there is an event to set when devices are added to the DB, do it
-            self._db_add_event.set()
+                logger.warning('Cannot resolve IPv6 ' + upnp_device.hostname + ' to MAC address (function not implemented yet)')
             
-        #print('service_types: ' + str(proxy.list_service_types()))    # Should be GLib.free()'d and list should also be GLib.List.free()'d
-        #print('services: ' + str(proxy.list_services()))    # Should be GLib.free()'d and list should also be GLib.List.free()'d
-        
+        self._database[key] = upnp_device
 
-    def device_unavailable(self, cp, proxy):
-        """Remove one UPnP device in database
+    def remove(self, key):
+        """Remove one UPnP device from database
         
-        \param cp A GUPnP.ControlPoint object that caught the new device event
-        \param proxy An instance of GUPnP.DeviceProxy to get information about this device
+        \param key A tuple containing (interface, protocol, udn), which is the key of the record to delete from the database 
         """
-        # See http://lazka.github.io/pgi-docs/#GUPnP-1.0/classes/DeviceInfo.html#gupnp-deviceinfo-methods
-        #print('Entering device_unavailable() with args: [' + str(cp) + ' ,' + str(proxy) + ']')
-        presentation_url = proxy.get_presentation_url()
-        (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
 
-        ip_version = guess_ip_version(purl_hostname)
+        logger.debug('Removing entry ' + str(key) + ' from database')
+        if key in self._database.keys():
+            del self._database[key]
+            
+    def reset(self):
+        """\brief Empty the database"""
+        self._database = {}
+            
+    def processEvent(self, upnp_event):
+        """\brief Update this database according to the \p upnp_event
+        
+        \param upnp_event The event to process, provided as an instance of UpnpBrowseDeviceEvent
+        """
+        
+        presentation_url = upnp_event.presentation_url
+        ip_version = guess_ip_version(presentation_url)
         if ip_version == 4:
             protocol = 'ipv4'
         elif ip_version == 6:
@@ -399,48 +483,34 @@ value:%s
         else:
             protocol = None
         
-        interface_osname = self.interface
-
-        udn = proxy.get_udn()
-
-        print('device_unavailable(): Got device with hostname=' + str(purl_hostname) + ', port=' + str(purl_port))
-
-        upnp_device = UpnpDevice(purl_hostname,
-                                 purl_port,
-                                 proxy.get_device_type(),
-                                 proxy.get_friendly_name(),
-                                 proxy.get_location(),
-                                 proxy.get_manufacturer(),
-                                 proxy.get_manufacturer_url(),
-                                 proxy.get_model_description(),
-                                 proxy.get_model_name(),
-                                 proxy.get_model_number(),
-                                 proxy.get_model_url(),
-                                 presentation_url,
-                                 proxy.get_serial_number(),
-                                 mac_address = None)
-
-        key = (interface_osname, protocol, udn)
+        key = (upnp_event.interface, upnp_event.protocol, upnp_event.udn)
         
-        msg = 'Should remove '
-        msg += 'service ' + str(key)
-        if not upnp_device is None:
-            msg += ' with details ' + str(upnp_device)
-        msg += ' to internal db'
-        logger.debug(msg)
+        (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
         
+        if upnp_event.event == 'add':
+            upnp_device = UpnpDevice(purl_hostname,
+                                     purl_port,
+                                     upnp_event.device_type,
+                                     upnp_event.friendly_name,
+                                     upnp_event.location,
+                                     upnp_event.manufacturer,
+                                     upnp_event.manufacturer_url,
+                                     upnp_event.model_description,
+                                     upnp_event.model_name,
+                                     upnp_event.model_number,
+                                     upnp_event.model_url,
+                                     presentation_url,
+                                     upnp_event.serial_number,
+                                     mac_address = None)
+            #logger.debug('Will process add event on device ' + str(upnp_device))
+            self.add(key, upnp_device)
+        elif upnp_event.event == 'del':
+            # With del events, we only use the key to delete the service (other info is not needed)
+            self.remove(key)
+        else:
+            raise Exception('UnknownEvent')
 
-        logger.debug('Removing entry ' + str(key) + ' from database')
-        if key in self._database.keys():
-            del self._database[key]
-            if self._db_del_event is not None:  # If there is an event to set when devices are removed from the DB, do it
-                self._db_del_event.set()
 
-
-    def reset(self):
-        """\brief Empty the database"""
-        self._database = {}
-        
 #     def keep_only_service_name(self, service_name):
 #         """\brief Filter the current database to remove all entries that do not match the specified \p service_name
 #         
@@ -454,14 +524,14 @@ value:%s
 # 
 #     def keep_only_ip_address(self, ip_address):
 #         """\brief Filter the current database to remove all entries that do not match the specified \p ip_address
-#         
+#          
 #         \param ip_address The IP address of entries to keep
 #         """
 #         try:
 #             records = self._database.iteritems()
 #         except AttributeError:
 #             records = self._database.items()
-#         
+#          
 #         for (key, bonjour_service) in records:
 #             if not bonjour_service is None:
 #                 if bonjour_service.ip_address == ip_address:
