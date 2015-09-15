@@ -451,7 +451,7 @@ value:%s
             upnp_device.mac_address = None
             if protocol == 'ipv4':
                 try:
-                    mac_address_list = arping(upnp_device.hostname, upnp_device.interface, use_sudo=self.use_sudo_for_arping)
+                    mac_address_list = arping(upnp_device.hostname, interface_osname, use_sudo=self.use_sudo_for_arping)
                     if len(mac_address_list) != 0:
                         if len(mac_address_list) > 1:  # More than one MAC address... issue a warning
                             logger.warning('Got more than one MAC address for host ' + str(upnp_device.hostname) + ': ' + str(mac_address_list) + '. Using first')
@@ -488,7 +488,10 @@ value:%s
         """
         
         presentation_url = upnp_event.presentation_url
-        ip_version = guess_ip_version(presentation_url)
+        
+        (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
+        
+        ip_version = guess_ip_version(purl_hostname)
         if ip_version == 4:
             protocol = 'ipv4'
         elif ip_version == 6:
@@ -497,8 +500,6 @@ value:%s
             protocol = None
         
         key = (upnp_event.interface, protocol, upnp_event.udn)
-        
-        (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
         
         if upnp_event.event == 'add':
             upnp_device = UpnpDevice(purl_hostname,
