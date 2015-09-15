@@ -197,44 +197,57 @@ class UpnpBrowseDeviceEvent:
         
         if entry_array is None:
             raise Exception('InvalidEntry')
+        
         type = entry_array[0]
         self._input = entry_array
-        if ((type == '+' or type == '-') and len(entry_array) != 6):
+        
+        if type == '+':
+            self.event = 'add'
+        elif type == '-':
+            self.event = 'del'
+        else:
+            raise Exception('UnknownType:' + type)
+        
+        if len(entry_array) != 14:
             raise Exception('InvalidEntry')
+
         self.interface = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[1])
         if not self.interface:
             raise Exception('InvalidEntry')
         self.udn = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[2])
         if not self.udn:
             raise Exception('InvalidEntry')
-        self.friendly_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[3])
+        self.device_type = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[3])
+        if not self.device_type:
+            raise Exception('InvalidEntry')
+        self.friendly_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[4])
         if not self.friendly_name:
             self.friendly_name = None
-        self.location = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[4])
+        self.location = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[5])
         if not self.location:
             self.location = None
-        self.manufacturer = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[5])
+        self.manufacturer = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[6])
         if not self.manufacturer:
             self.manufacturer = None
-        self.manufacturer_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[6])
+        self.manufacturer_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[7])
         if not self.manufacturer_url:
             self.manufacturer_url = None
-        self.model_description = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[7])
+        self.model_description = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[8])
+        if not self.model_description:
+            self.model_description = None
+        self.model_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[9])
         if not self.model_name:
             self.model_name = None
-        self.model_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[8])
+        self.model_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[10])
         if not self.model_number:
             self.model_number = None
-        self.model_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[9])
+        self.model_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[11])
         if not self.model_url:
             self.model_url = None
-        self.model_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[10])
-        if not self.model_url:
-            self.model_url = None
-        self.presentation_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[11])
+        self.presentation_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[12])
         if not self.presentation_url:
             self.presentation_url = None
-        self.serial_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[12])
+        self.serial_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[13])
         if not self.serial_number:
             self.serial_number = None
 
@@ -248,14 +261,14 @@ class UpnpBrowseDeviceEvent:
         return self.txt_missing_end
         
     def add_line(self, line):
-        """\brief Provided additional lines to fill-in this service description. This is not supported because UpnpBrowser's output never span multiple lines, but it is kept here for homogeneous interface with the Robotframework BonjourLibrary
+        """\brief Provided additional lines to fill-in this device description. This is not supported because UpnpBrowser's output never span multiple lines, but it is kept here for homogeneous interface with the Robotframework BonjourLibrary
         
         \param line A new line to process, encoded as UTF-8 (without the terminating carriage return)
         """
         raise Exception('ExtraInputLine')
     
     @staticmethod
-    def unescape_avahibrowse_string(input):
+    def unescape_upnpbrowse_string(input):
         """\brief Unescape all escaped characters in string \p input
         
         \param input String to unescape
@@ -269,11 +282,11 @@ class UpnpBrowseDeviceEvent:
             output += input[:espace_pos]
             #print(output + '==>' + new_chunk)
             try:
-                escaped_char = int(new_chunk[0]) * 100 + int(new_chunk[1]) * 10 + int(new_chunk[2])    # Fetch 3 following digits and convert them to a decimal value
-                output += chr(escaped_char)    # Append escaped character to output (note: if escaped_char is not a byte (>255 for example), an exception will be raised here
-                new_chunk = new_chunk[3:]    # Skip the 3 characters that make the escaped ASCII value
+                escaped_char = int(new_chunk[0]) * 100 + int(new_chunk[1]) * 10 + int(new_chunk[2])	# Fetch 3 following digits and convert them to a decimal value
+                output += chr(escaped_char)	# Append escaped character to output (note: if escaped_char is not a byte (>255 for example), an exception will be raised here
+                new_chunk = new_chunk[3:]	# Skip the 3 characters that make the escaped ASCII value
             except:
-                output += '\\'    # This was not an escaped character... re-insert the '\'
+                output += '\\'	# This was not an escaped character... re-insert the '\'
             
             input = new_chunk
             espace_pos = input.find('\\')
@@ -483,7 +496,7 @@ value:%s
         else:
             protocol = None
         
-        key = (upnp_event.interface, upnp_event.protocol, upnp_event.udn)
+        key = (upnp_event.interface, protocol, upnp_event.udn)
         
         (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
         
@@ -694,89 +707,86 @@ class UpnpLibrary:
     ROBOT_LIBRARY_DOC_FORMAT = 'ROBOT'
     ROBOT_LIBRARY_SCOPE = 'GLOBAL'
     ROBOT_LIBRARY_VERSION = '1.0'
+    UPNP_BROWSER_DEFAULT_EXEC = 'scripts/UpnpBrowser.py'
 
-    def __init__(self, use_sudo_for_arping=True):
+    def __init__(self, upnp_browser_exec_path=None, use_sudo_for_arping=True):
         self._service_database = None
         self._service_database_mutex = threading.Lock()    # This mutex protects writes to the _service_database attribute
-        self._service_database_added_event = threading.Event()    # This event is set when a device is added to the database
-        self._service_database_deleted_event = threading.Event()    # This event is set when a device is added to the database
+        if upnp_browser_exec_path is None:
+            self._upnp_browser_exec_path = UpnpLibrary.UPNP_BROWSER_DEFAULT_EXEC
+        else:
+            self._upnp_browser_exec_path = upnp_browser_exec_path
         self._use_sudo_for_arping = use_sudo_for_arping
 
+    def _parse_upnp_browse_output(self, upnp_browse_process, interface_name_filter = None, ip_type_filter = None, event_callback = None):
+        """Parse the output of an existing upnp-browse command and update self._service_database accordingly until the subprocess terminates
+        \param upnp_browse_process A subprocess.Popen object for which we will process the output
+        \param interface_name_filter If not None, we will only process services on this interface name
+        \param ip_type_filter If not None, we will only process services with this IP type
+        \param event_callback If not None, we will call this function for each database update, giving it the new UpnpBrowseDeviceEvent as argument
+        """
+        previous_line_continued = False
+        upnp_event = None
+        #print('Going to parse output of process PID ' + str(upnp_browse_process.pid))
+        # We cannot use stdout iterator as usual here, because it adds some buffering on the subprocess stdout that will not provide us the output lines in real-time
+        line = upnp_browse_process.stdout.readline()
+        while line:
+            line = line.rstrip('\n')
+            print('upnp-browse:"' + line + '"')
+            if previous_line_continued:
+                upnp_event.add_line(line)
+            else:
+                upnp_event = UpnpBrowseDeviceEvent(line.split(';'))
+            previous_line_continued = upnp_event.continued_on_next_line()
+            if not previous_line_continued:
+                #~ print('Getting event ' + str(upnp_event))
+                if interface_name_filter is None or upnp_event.interface == interface_name_filter:   # Only take into account services on the requested interface (if an interface was provided)
+                    if ip_type_filter is None or upnp_event.ip_type == ip_type_filter:   # Only take into account services running on the requested IP stack (if an IP version was provided)
+                        with self._service_database_mutex:
+                            self._service_database.processEvent(upnp_event)
+                        if not event_callback is None and hasattr(event_callback, '__call__'):
+                            event_callback(upnp_event) # If there is a callback to trigger when an event is processed, also run the callback
+            line = upnp_browse_process.stdout.readline()
+
     def get_services(self, device_type = 'upnp:rootdevice', interface_name = None, ip_type = None, resolve_ip = True):
+        """Get all currently published UPnP services as a list
+        
+        First (optional) argument `device_type` is the type of service (in the GUPnP terminology, the default value being `upnp:rootdevice`)
+        Second (optional) argument `interface_name` is the name of the network interface on which to browse for UPnP devices (if not specified, search will be performed on all valid network interfaces)
+        Third (optional) argument `ip_type` is the type of IP protocol to filter our (eg: `ipv6`, or `ipv4`, the default values being any IP version)
+        Fourth (optional) argument `resolve_ip`, when True, will also include the MAC address of devices in results (default value is to resolve IP addresses)
+        
+        Return a list of services found on the network (one entry per service, each service being described by a tuple containing (interface_osname, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address) = tuple
+        The return value can be stored and re-used later on to rework on this service list (see keyword `Import Results`) 
+        
+        Example:
+        | @{result_list} = | Get Services | upnp:rootdevice |
+        
+        | @{result_list} = | Get Services | upnp:rootdevice | eth1 |
+        
+        | @{result_list} = | Get Services | upnp:rootdevice | eth1 | ipv6 |
         """
-        """
-        
-        with self._service_database_mutex:
-            self._service_database = UpnpDeviceDatabase(interface = interface_name,
-                                                        resolve_mac = resolve_ip,
-                                                        use_sudo_for_arping = self._use_sudo_for_arping,
-                                                        db_add_event = self._service_database_added_event,
-                                                        db_del_event = self._service_database_deleted_event
-                                                        )
-        
-#         if service_type and service_type != '*':
-#             service_type_arg = service_type
-#         else:
-#             service_type_arg = '-a'
-# 
-#         p = subprocess.Popen(['avahi-browse', '-p', '-r', '-l', '-t', service_type_arg], stdout=subprocess.PIPE)
-#         self._parse_avahi_browse_output(avahi_browse_process=p, interface_name_filter=interface_name, ip_type_filter=ip_type)
-        
-#         with self._service_database_mutex:
-#             logger.debug('Services found: ' + str(self._service_database))
-#             return self._service_database.export_to_tuple_list()
         
         if interface_name is None:
-            raise('InterfaceNameMandatory')
+            logger.error('Browsing on all interfaces is not supported in UpnpLibrary')
+            raise Exception('NotSupported')
         
-        try:
-            ctx = GUPnP.Context.new(None, interface_name, 0)
-        except TypeError:
-            # Versions of gupnp older than 0.17.2 require context to be non None
-            # Newer versions have deprecated use of any non-None first argument
-            # See http://lazka.github.io/pgi-docs/#GUPnP-1.0/classes/Context.html#GUPnP.Context.new
-            main_ctx = GLib.main_context_default() 
-            ctx = GUPnP.Context.new(main_ctx, interface_name, 0)
-            
+        with self._service_database_mutex:
+            self._service_database = UpnpDeviceDatabase(resolve_mac = resolve_ip, use_sudo_for_arping = self._use_sudo_for_arping)
+        
+        if device_type and device_type != '*':
+            device_type_arg = ['-T', device_type]
+        else:
+            device_type_arg = []
 
-        cp = GUPnP.ControlPoint.new(ctx, device_type)
-        cp.set_active(True)
-        id1 = cp.connect("device-proxy-available", self._service_database.device_available)
-        id2 = cp.connect("device-proxy-unavailable", self._service_database.device_unavailable)
-        id3 = cp.connect("service-proxy-available", self._service_database.service_available)
-        id4 = cp.connect("service-proxy-unavailable", self._service_database.service_unavailable)
-        print('Going to run mainloop forever')
-        _mainloop = GLib.MainLoop()
-        
-        def _quit_dbus_when_discovery_done():
-            """This method will notify that we assume database construction is finished
-            """
-            logger.debug('Waiting for event')
-            while self._service_database_added_event.wait(5):
-                logger.debug('Got add event... resetting timer')
-                self._service_database_added_event.clear()  # Reset the flag we are watching... let the DB notify us when changes are made
-            
-            _mainloop.quit()
-
-        _dbus_stop_loop_thread = threading.Thread(target = _quit_dbus_when_discovery_done)    # Start a background thread that will stop the mainloop below when no new discovery occurs
-        _dbus_stop_loop_thread.setDaemon(True)    # D-Bus loop should be forced to terminate when main program exits
-        _dbus_stop_loop_thread.start()
-
-        _mainloop.run()
-        logger.debug('Mainloop has terminated')
-        
-        cp.disconnect(id1)
-        cp.disconnect(id2)
-        cp.disconnect(id3)
-        cp.disconnect(id4)
-        cp.set_active(False)
-        
-        logger.debug('Control point is now inactive')
+        p = subprocess.Popen([self._upnp_browser_exec_path, '-i', interface_name, '-t'] + device_type_arg, stdout=subprocess.PIPE)
+        self._parse_upnp_browse_output(upnp_browse_process=p, interface_name_filter=interface_name, ip_type_filter=ip_type)
         
         with self._service_database_mutex:
             logger.debug('Services found: ' + str(self._service_database))
             return self._service_database.export_to_tuple_list()
-
+        
+    
 #     def get_ip(self, mac):
 #         """ Get first IP address which have `mac` in UUID.
 # 
@@ -921,33 +931,50 @@ if __name__ == '__main__':
         from console_logger import LOGGER as logger
     except ImportError:
         import logging
-    
+
     logger = logging.getLogger('console_logger')
     logger.setLevel(logging.DEBUG)
     
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(handler)
-    
+
     try:
         input = raw_input
     except NameError:
         pass
 
-    MAC = '00:04:74:05:00:f0'
+    host = 'hal'
+    if host=='hal':
+        IP = '169.254.2.35'
+        MAC = '00:04:74:12:00:00'
+        exp_service = 'Wifi_wifi-soho_120000'
+    elif host=='hal2':
+        IP = '169.254.5.18'
+        MAC = 'C4:93:00:02:CA:10'
+        exp_service = 'Wifi_wifi-soho_02CA10'
+    
+    #print('Arping result: ' + str(arping(ip_address='10.10.8.1', interface='eth0', use_sudo=True)))
+    UPNP_BROWSER = 'scripts/UpnpBrowser.py'
     UL = UpnpLibrary()
-    input('Press enter & "Enable UPnP/Bonjour" on web interface')
-    UL.get_services(interface_name = 'eth0')
-#         IP = UL.get_ip(MAC)
-#         assert IP == '10.10.8.39'
-#         input('Press enter & "Disable UPnP/Bonjour" on web interface')
-#         UL.clear_queue()
-#         DATA = UL.check_on_to_off(IP)
-#         DATA = UL.check_stop(IP)
-#         input('Press enter & "Enable UPnP/Bonjour" on web interface')
-#         DATA = UL.check_on(IP)
-#         DATA = UL.check_run(IP)
-#         FILENAME = UL.retrieve_xml(DATA)
-#         assert FILENAME is not None
+    input('Press enter & "Enable UPnP" on device')
+    temp_cache = UL.get_services(interface_name='eth0')
+    if IP != UL.get_ipv4_for_service_name(exp_service):
+        raise Exception('Error')
+    if IP != UL.get_ipv4_for_mac(MAC):
+        raise Exception('Error')
+    #if 'fe80::21a:64ff:fe94:86a2' != UL.get_ipv6_for_mac(MAC):
+    #    raise Exception('Error')
+    UL.expect_service_on_ip(IP)
+    UL.import_results([])  # Make sure we reset the internal DB
+    UL.expect_no_service_on_ip(IP)  # So there should be no service of course!
+    UL.import_results(temp_cache)  # Re-import previous results
+    UL.expect_service_on_ip(IP)  # We should get again the service that we found above
+    input('Press enter & puULish a service called "' + exp_service + '" within 10s')
+    UL.wait_for_service_name(exp_service, timeout=10, service_type = '_http._tcp', interface_name='eth1')
+    input('Press enter & either DisaULe Bonjour on device or stop puULishing service called "' + exp_service + '" within 20s')
+    UL.wait_for_no_service_name(exp_service, timeout=20, service_type = '_http._tcp', interface_name='eth1')
+    UL.get_services(service_type='_http._tcp', interface_name='eth1')
+    UL.expect_no_service_on_ip(IP)
 else:
     from robot.api import logger
