@@ -317,6 +317,7 @@ class UpnpDevice:
     
     def __init__(self,
                  hostname,
+                 ip_address,
                  port, 
                  device_type,
                  friendly_name,
@@ -331,6 +332,7 @@ class UpnpDevice:
                  serial_number,
                  mac_address = None):
         self.hostname = hostname
+        self.ip_address = ip_address
         self.port = port
         self.device_type = device_type
         self.friendly_name = friendly_name
@@ -346,8 +348,8 @@ class UpnpDevice:
         self.mac_address = mac_address
 
     def __repr__(self):
-        if self.hostname:
-            result = '[' + str(self.hostname)
+        if self.ip_address:
+            result = '[' + str(self.ip_address)
             if not self.port is None:
                 result += ':' + str(self.port)
             result += ']'
@@ -395,7 +397,8 @@ value:%s
 ''' % (key, value)
         return temp
 
-    def _upnp_purl_to_details(self, presentation_url):
+    @staticmethod
+    def _upnp_purl_to_details(presentation_url):
         """Convert a presentation URL to a tuple of protocol, hostname, port, path
         \param presentation_url
         
@@ -436,6 +439,22 @@ value:%s
                 purl_port = 443
         
         return (purl_proto, purl_hostname, purl_port, purl_path)
+    
+    @staticmethod
+    def _hostname_to_ip_address(ip_version, hostname):
+        """Resolve a hostname to an IP address
+        
+        \param ip_version 4 to resolve to an IPv4 or 6 to resolve to an IPv6
+        \param hostname The hostname to be resolved
+        
+        \return The IP address of the provided \p hostname
+        """
+        hostname_contains_ip_version = guess_ip_version(hostname)
+        if ip_version == 4 and hostname_contains_ip_version == 4:
+            return hostname
+        if ip_version == 6 and hostname_contains_ip_version == 6:
+            return hostname
+        raise('HostnameResolutionNotSupported')
         
     def add(self, key, upnp_device):
         """Add one UPnP device in database
@@ -451,19 +470,19 @@ value:%s
             upnp_device.mac_address = None
             if protocol == 'ipv4':
                 try:
-                    mac_address_list = arping(upnp_device.hostname, interface_osname, use_sudo=self.use_sudo_for_arping)
+                    mac_address_list = arping(upnp_device.ip_address, interface_osname, use_sudo=self.use_sudo_for_arping)
                     if len(mac_address_list) != 0:
                         if len(mac_address_list) > 1:  # More than one MAC address... issue a warning
-                            logger.warning('Got more than one MAC address for host ' + str(upnp_device.hostname) + ': ' + str(mac_address_list) + '. Using first')
+                            logger.warning('Got more than one MAC address for host ' + str(upnp_device.ip_address) + ': ' + str(mac_address_list) + '. Using first')
                         upnp_device.mac_address = mac_address_list[0]
                 except Exception as e:
                     if e.message != 'ArpingSubprocessFailed':   # If we got an exception related to anything else than arping subprocess...
                         raise   # Raise the exception
                     else:
-                        logger.warning('Arping failed for IP address ' + str(upnp_device.hostname) + '. Continuing anyway but MAC address will remain set to None')
+                        logger.warning('Arping failed for IP address ' + str(upnp_device.ip_address) + '. Continuing anyway but MAC address will remain set to None')
                         # Otherwise, we will just not resolve the IP address into a MAC... too bad, but maybe not that blocking
             else:
-                logger.warning('Cannot resolve IPv6 ' + upnp_device.hostname + ' to MAC address (function not implemented yet)')
+                logger.warning('Cannot resolve IPv6 ' + upnp_device.ip_address + ' to MAC address (function not implemented yet)')
             
         self._database[key] = upnp_device
 
@@ -480,7 +499,7 @@ value:%s
     def reset(self):
         """\brief Empty the database"""
         self._database = {}
-            
+    
     def processEvent(self, upnp_event):
         """\brief Update this database according to the \p upnp_event
         
@@ -489,7 +508,7 @@ value:%s
         
         presentation_url = upnp_event.presentation_url
         
-        (purl_proto, purl_hostname, purl_port, purl_path) = self._upnp_purl_to_details(presentation_url)
+        (purl_proto, purl_hostname, purl_port, purl_path) = UpnpDeviceDatabase._upnp_purl_to_details(presentation_url)
         
         ip_version = guess_ip_version(purl_hostname)
         if ip_version == 4:
@@ -503,6 +522,7 @@ value:%s
         
         if upnp_event.event == 'add':
             upnp_device = UpnpDevice(purl_hostname,
+                                     UpnpDeviceDatabase._hostname_to_ip_address(ip_version, purl_hostname),
                                      purl_port,
                                      upnp_event.device_type,
                                      upnp_event.friendly_name,
@@ -603,71 +623,71 @@ value:%s
     def import_from_tuple(self, tuple):
         """\brief Import a record into this database from a tuples
          
-        \param tuple A tuple containing (interface, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address), as exported into a list using export_to_tuple_list() for example 
+        \param tuple A tuple containing (interface, protocol, udn, hostname, ip_address, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address), as exported into a list using export_to_tuple_list() for example 
         """
-        (interface_osname, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address) = tuple
+        (interface_osname, protocol, udn, hostname, ip_address, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address) = tuple
         key = (interface_osname, protocol, udn)
-        upnp_device = UpnpDevice(hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)
+        upnp_device = UpnpDevice(hostname, ip_address, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)
         self.add(key, upnp_device)
     
-#     def is_ip_address_in_db(self, ip_address):
-#         try:
-#             records = self._database.iteritems()
-#         except AttributeError:
-#             records = self._database.items()
-#         
-#         for (key, bonjour_service) in records:
-#             if not bonjour_service is None:
-#                 if bonjour_service.ip_address == ip_address:
-#                     return True
-#         return False
-# 
-#     def is_mac_address_in_db(self, mac_address):
-#         if mac_address is None:
-#             return False
-#         
-#         try:
-#             records = self._database.iteritems()
-#         except AttributeError:
-#             records = self._database.items()
-#         
-#         for (key, bonjour_service) in records:
-#             if not bonjour_service is None:
-#                 if bonjour_service.mac_address == mac_address:
-#                     return True
-#         return False
-#         
-#     def get_ip_address_from_mac_address(self, searched_mac, ip_type = 'all'):
-#         """\brief Check the IP address of a Bonjour device, given its MAC address
-#         
-#         Note: the database must have been filled with a list of devices prior to calling this method
-#         An exception will be raised if there are two different matches in the db... None will be returned if there is no match
-#         
-#         \param searched_mac The MAC address of the device to search
-#         \param ip_type The version of IP searched ('ipv4', 'ipv6' or 'all' (default)
-#         
-#         \return The IP address of the device (if found)
-#         """
-# 
-#         searched_mac = mac_normalise(searched_mac, False)
-#         match = None
-#         
-#         for key in self._database.keys():
-#             protocol = key[1]
-#             if ip_type == 'all' or protocol == ip_type:
-#                 bonjour_service = self._database[key]
-#                 if not bonjour_service is None:
-#                     mac_product = bonjour_service.mac_address
-#                     if not mac_product is None:
-#                         mac_product = mac_normalise(mac_product, False)
-#                         if searched_mac == mac_product:
-#                             ip_address = self._database[key].ip_address
-#                             if match is None:
-#                                 match = ip_address
-#                             elif match == ip_address: # Error... there are two matching entries, with different IP addresses!
-#                                 raise Exception('DuplicateMACAddress')
-#         return match
-# 
+    def is_ip_address_in_db(self, ip_address):
+        try:
+            records = self._database.iteritems()
+        except AttributeError:
+            records = self._database.items()
+         
+        for (key, upnp_device) in records:
+            if not upnp_device is None:
+                if upnp_device.ip_address == ip_address:
+                    return True
+        return False
+ 
+    def is_mac_address_in_db(self, mac_address):
+        if mac_address is None:
+            return False
+         
+        try:
+            records = self._database.iteritems()
+        except AttributeError:
+            records = self._database.items()
+         
+        for (key, upnp_device) in records:
+            if not upnp_device is None:
+                if upnp_device.mac_address == mac_address:
+                    return True
+        return False
+         
+    def get_ip_address_from_mac_address(self, searched_mac, ip_type = 'all'):
+        """\brief Check the IP address of a UPnP device, given its MAC address
+         
+        Note: the database must have been filled with a list of devices prior to calling this method
+        An exception will be raised if there are two different matches in the db... None will be returned if there is no match
+         
+        \param searched_mac The MAC address of the device to search
+        \param ip_type The version of IP searched ('ipv4', 'ipv6' or 'all' (default)
+         
+        \return The IP address of the device (if found)
+        """
+ 
+        searched_mac = mac_normalise(searched_mac, False)
+        match = None
+         
+        for key in self._database.keys():
+            protocol = key[1]
+            if ip_type == 'all' or protocol == ip_type:
+                upnp_device = self._database[key]
+                if not upnp_device is None:
+                    mac_product = upnp_device.mac_address
+                    if not mac_product is None:
+                        mac_product = mac_normalise(mac_product, False)
+                        if searched_mac == mac_product:
+                            ip_address = self._database[key].ip_address
+                            if match is None:
+                                match = ip_address
+                            elif match == ip_address: # Error... there are two matching entries, with different IP addresses!
+                                raise Exception('DuplicateMACAddress')
+        return match
+ 
 #     def get_ip_address_from_name(self, searched_name, ip_type = 'all'):
 #         """\brief Check the IP address of a Bonjour device, given its published name
 #         
@@ -949,18 +969,18 @@ if __name__ == '__main__':
     if host=='hal':
         IP = '169.254.2.35'
         MAC = '00:04:74:12:00:00'
-        exp_service = 'Wifi_wifi-soho_120000'
+        exp_device = 'Wifi_wifi-soho_120000'
     elif host=='hal2':
         IP = '169.254.5.18'
         MAC = 'C4:93:00:02:CA:10'
-        exp_service = 'Wifi_wifi-soho_02CA10'
+        exp_device = 'Wifi_wifi-soho_02CA10'
     
     #print('Arping result: ' + str(arping(ip_address='10.10.8.1', interface='eth0', use_sudo=True)))
     UPNP_BROWSER = 'scripts/UpnpBrowser.py'
     UL = UpnpLibrary()
     input('Press enter & "Enable UPnP" on device')
     temp_cache = UL.get_services(interface_name='eth0')
-    if IP != UL.get_ipv4_for_service_name(exp_service):
+    if IP != UL.get_ipv4_for_device_name(exp_device):
         raise Exception('Error')
     if IP != UL.get_ipv4_for_mac(MAC):
         raise Exception('Error')
