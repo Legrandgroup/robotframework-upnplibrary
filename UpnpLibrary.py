@@ -183,16 +183,16 @@ class UpnpBrowseDeviceEvent:
         The properties that are populated inside this class are:
         self.interface The network interface on which the device has been discovered (following the OS notation, eg: 'eth0')
         self.udn The UDN of the UPnP device (unique ID)
-        self.friendly_name
-        self.location
-        self.manufacturer
-        self.manufacturer_url
-        self.model_description
-        self.model_name
-        self.model_number
-        self.model_url
-        self.presentation_url
-        self.serial_number
+        self.friendly_name The UPnP friendly name (displayed when browsing the network neighborhood)
+        self.location The URL of the xml device description
+        self.manufacturer The device manufacturer (if any)
+        self.manufacturer_url The device manufacturer's online URL (if any)
+        self.model_description A (human readable) model description of the device (if any)
+        self.model_name The model name of the device (if any)
+        self.model_number The model number (usually a product version, or revision) of the device (if any)
+        self.model_url An URL to an online device model description (if any)
+        self.presentation_url The URL to connect to when double-clicking on the device, usually showing status or configuration webpages (if any)
+        self.serial_number The serial number of the device, often matching with the MAC address (if any)
         """
         
         if entry_array is None:
