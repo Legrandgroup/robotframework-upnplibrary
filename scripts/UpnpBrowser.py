@@ -147,6 +147,10 @@ class UpnpDeviceWatcher():
 		output += self.escape_string(serial_number)
 
 		print(output, file=sys.stdout)
+		try:
+			sys.stdout.flush()	# Make sure we flush at each line
+		except IOError:
+			pass	# If output stream is already closed (caller has exitted, for example=, we would get an exception here... just ignore it (we have output the line anyway)
 		#print('service_types: ' + str(proxy.list_service_types()))	# Should be GLib.free()'d and list should also be GLib.List.free()'d
 		#print('services: ' + str(proxy.list_services()))	# Should be GLib.free()'d and list should also be GLib.List.free()'d
 		
