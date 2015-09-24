@@ -688,33 +688,33 @@ value:%s
                                 raise Exception('DuplicateMACAddress')
         return match
  
-#     def get_ip_address_from_name(self, searched_name, ip_type = 'all'):
-#         """\brief Check the IP address of a Bonjour device, given its published name
-#         
-#         Note: the database must have been filled with a list of devices prior to calling this method
-#         An exception will be raised if there are two different matches in the db... None will be returned if there is no match
-#         
-#         \param searched_name The MAC address of the device to search
-#         \param ip_type The version of IP searched ('ipv4', 'ipv6' or 'all' (default)
-#         
-#         \return The IP address of the device (if found)
-#         """
-# 
-#         match = None
-#         #logger.debug('Searching for service "' + searched_name + '" to get its device IP type: ' + ip_type)
-#         for key in self._database.keys():
-#             protocol = key[1]
-#             if ip_type == 'all' or protocol == ip_type:
-#                 service_name_product = key[2]
-#                 if searched_name == service_name_product:
-#                     bonjour_service = self._database[key]
-#                     if not bonjour_service is None:
-#                         ip_address = bonjour_service.ip_address
-#                         if match is None:
-#                             match = ip_address
-#                         elif match == ip_address: # Error... there are two matching entries, with different IP addresses!
-#                             raise Exception('DuplicateServiceName')
-#         return match
+    def get_ip_address_from_name(self, searched_name, ip_type = 'all'):
+        """\brief Check the IP address of a UPnP device, given its published name
+         
+        Note: the database must have been filled with a list of devices prior to calling this method
+        An exception will be raised if there are two different matches in the db... None will be returned if there is no match
+         
+        \param searched_name The MAC address of the device to search
+        \param ip_type The version of IP searched ('ipv4', 'ipv6' or 'all' (default)
+         
+        \return The IP address of the device (if found)
+        """
+ 
+        match = None
+        #logger.debug('Searching for service "' + searched_name + '" to get its device IP type: ' + ip_type)
+        for key in self._database.keys():
+            protocol = key[1]
+            if ip_type == 'all' or protocol == ip_type:
+                upnp_device = self._database[key]
+                if not upnp_device is None:
+                    service_name_product = upnp_device.friendly_name
+                    if service_name_product == service_name_product:
+                        ip_address = upnp_device.ip_address
+                        if match is None:
+                            match = ip_address
+                        elif match == ip_address: # Error... there are two matching entries, with different IP addresses!
+                            raise Exception('DuplicateServiceName')
+        return match
     
     def service_available(self, *kwargs):
         print('Entering service_available() with args: ' + str(kwargs))
@@ -946,6 +946,151 @@ class UpnpLibrary:
 #         ret = unicode(ret)
 #         return ret
 
+    def get_service_on_ip(self, ip_address):
+        """Reduce the current server database for only services matching with the provided IP address
+        
+        Note: `Get Services` or `Import Results` must have been run prior to calling this keyword
+        To make sure you restrict to IPv4 or IPv6, filter IP types when running `Get Services`
+        
+        Note: running this keyword will have the effect of changing the current database results from `Get Services` (used by other keywords)
+        
+        Example:
+        | Get Services | upnp:rootdevice | eth1 | ipv4 |
+        | @{result_list} = | Get Service On IP | 192.168.0.1 |
+        """
+
+        with self._service_database_mutex:
+            self._service_database.keep_only_ip_address(ip_address)
+            return self._service_database.export_to_tuple_list()
+            
+    def get_service_on_mac(self, mac_address):
+        """Reduce the current server database for only services matching with the provided MAC address
+        
+        Note: `Get Services` or `Import Results` must have been run prior to calling this keyword
+        To make sure you restrict to IPv4 or IPv6, filter IP types when running `Get Services`
+        
+        Note: running this keyword will have the effect of changing the current database results from `Get Services` (used by other keywords)
+        
+        Example:
+        | Get Services | upnp:rootdevice | eth1 | ipv4 |
+        | @{result_list} = | Get Service On MAC | 00:04:74:02:26:47 |
+        """
+
+        with self._service_database_mutex:
+            self._service_database.keep_only_mac_address(mac_address)
+            return self._service_database.export_to_tuple_list()
+
+    def expect_service_on_ip(self, ip_address):
+        """Test if a service has been listed on device with IP address `ip_address`
+        
+        Note: `Get Services` or `Import Results` must have been run prior to calling this keyword
+        To make sure you restrict to IPv4 or IPv6, filter IP types when running `Get Services`
+        
+        Example:
+        | Expect Service On IP | 192.168.0.1 |
+        """
+
+        with self._service_database_mutex:
+            if not self._service_database.is_ip_address_in_db(ip_address):
+                raise Exception('ServiceNotFoundOn:' + str(ip_address))
+
+    def expect_no_service_on_ip(self, ip_address):
+        """Test if a service is absent from device with IP address `ip_address`
+        
+        Note: `Get Services` or `Import Results` must have been run prior to calling this keyword
+        To make sure you restrict to IPv4 or IPv6, filter IP types when running `Get Services`
+        
+        Example:
+        | Expect No Service On IP | 192.168.0.1 |
+        """
+
+        with self._service_database_mutex:
+            if self._service_database.is_ip_address_in_db(ip_address):
+                raise Exception('ServiceExistsOn:' + str(ip_address))
+    
+    def get_ipv4_for_mac(self, mac):
+        """Returns the IPv4 address matching MAC address from the list a Bonjour devices in the database
+        
+        Note: The search will be performed on the service cache so `Get Services` or `Import Results` must have been run prior to calling this keyword
+        If there is more than one IPv4 address matching with the MAC address, an exception will be raised (unlikely except if there is an IP address update in the middle of `Get Services`)
+        
+        Return the IPv4 address or None if the MAC address was not found.
+        
+        Example:
+        | Get IPv4 For MAC | 00:04:74:12:00:01 |
+        =>
+        | 169.254.47.26 |
+        """
+
+        with self._service_database_mutex:
+            return self._service_database.get_ip_address_from_mac_address(mac, ip_type='ipv4')
+
+    def get_ipv6_for_mac(self, mac):
+        """Returns the IPv6 address matching MAC address mac from the list a Bonjour devices in the database
+        
+        Note: The search will be performed on the service cache so `Get Services` or `Import Results` must have been run prior to calling this keyword
+        If there is more than one IPv4 address matching with the MAC address, an exception will be raised (unlikely except if there is an IP address update in the middle of `Get Services`)
+        
+        Return the IPv6 address or None if the service was not found.
+        
+        Example:
+        | Get IPv6 For MAC | 00:04:74:12:00:01 |
+        =>
+        | fe80::204:74ff:fe12:1 |
+        """
+
+        with self._service_database_mutex:
+            return self._service_database.get_ip_address_from_mac_address(mac, ip_type='ipv6')
+
+    def get_ipv4_for_device_name(self, device_name):
+        """Get the IPv4 address for the device named `device_name`.
+        
+        Note: The search will be performed on the service cache so `Get Services` or `Import Results` must be called before calling this keyword
+        
+        Return the IPv4 address or None if the service was not found.
+        If more than one service matches \p device_name, an exception will be raised
+        
+        Example:
+        | ${ip} = | Get IPv4 For Device Name | Workstation000474 |
+        =>
+        | 169.254.4.74 |
+        """
+
+        with self._service_database_mutex:
+            return self._service_database.get_ip_address_from_name(device_name, ip_type='ipv4')
+
+    def get_ipv6_for_device_name(self, device_name):
+        """Get the IPv6 address for the device named `device_name`.
+        
+        Note: The search will be performed on the service cache so `Get Services` or `Import Results` must be called before calling this keyword
+        
+        Return the IPv6 address or None if the service was not found.
+        If more than one service matches \p device_name, an exception will be raised
+        
+        Example:
+        | ${ip} = | Get IPv6 For Device Name | Workstation000474 |
+        =>
+        | fe80::1 |
+        """
+
+        with self._service_database_mutex:
+            return self._service_database.get_ip_address_from_name(device_name, ip_type='ipv6')
+    
+    def import_results(self, result_list):
+        """Import a service result list (previously returned by `Get Services` in order to work again/filter/extract from that list
+        
+        Will raise an exception of the list is not correctly formatted
+        
+        Example:
+        | Import Results | @{result_list} |
+        """
+        
+        logger.info('Manually importing the following results into the database:' + str(result_list))
+        with self._service_database_mutex:
+            self._service_database.reset()
+            for service in result_list:
+                self._service_database.import_from_tuple(service)
+
 
 if __name__ == '__main__':
     try:
@@ -965,23 +1110,25 @@ if __name__ == '__main__':
     except NameError:
         pass
 
-    host = 'hal'
+    host = 'hal2'
     if host=='hal':
         IP = '169.254.2.35'
         MAC = '00:04:74:12:00:00'
         exp_device = 'Wifi_wifi-soho_120000'
     elif host=='hal2':
-        IP = '169.254.5.18'
-        MAC = 'C4:93:00:02:CA:10'
-        exp_device = 'Wifi_wifi-soho_02CA10'
+        IP = '10.10.8.75'
+        MAC = '00:04:74:05:00:BA'
+        exp_device = 'LegrandAP_AP Wifi_0500BA'
     
     #print('Arping result: ' + str(arping(ip_address='10.10.8.1', interface='eth0', use_sudo=True)))
     UPNP_BROWSER = 'scripts/UpnpBrowser.py'
     UL = UpnpLibrary()
     input('Press enter & "Enable UPnP" on device')
     temp_cache = UL.get_services(interface_name='eth0')
+    print(UL.get_ipv4_for_device_name(exp_device))
     if IP != UL.get_ipv4_for_device_name(exp_device):
         raise Exception('Error')
+    print(UL.get_ipv4_for_mac(MAC))
     if IP != UL.get_ipv4_for_mac(MAC):
         raise Exception('Error')
     #if 'fe80::21a:64ff:fe94:86a2' != UL.get_ipv6_for_mac(MAC):
