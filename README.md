@@ -36,8 +36,10 @@ In order to have gupnp-gi work on you machine,
 
 Move to the sources directory, and instal all pre-requisite build tools.
 
-For example, on a Debian Jessie distro, I had to:
-```apt-get install gtk-doc-tools libgupnp-1.0-dev```
+For example, on a Debian Jessie distro, I had to run:
+```
+apt-get install gtk-doc-tools libgupnp-1.0-dev
+```
 
 If there are issues for glib undefined symbols, you can edit the `Makefile.am`,
 remove from the `SUBDIRS` variable all striclty non-required (non-runtime)
@@ -93,29 +95,29 @@ Return a list of devices found on the network
 Each entry of the list will contain a tuple describing a device. The tuple's 
 element are (in order).
 
-* interface: The network interface on which the service has been discovered
-  (following the OS notation, eg: 'eth0')
-* protocol: The type of IP protocol on which the service is published ('ipv4'
-  or 'ipv6')
-* udn: The UDN of the UPnP device (unique ID)
-* hostname: The hostname (IP address) of the device, extracted from the
-  presentation URL
-* port: The TCP port on which the device will provide a web interface,
-  extracted from the presentation URL
-* friendly_name: The UPnP friendly name (displayed when browsing the network 
-  neighborhood)
-* location: The URL of the xml device description
-* manufacturer: The device manufacturer (if any)
-* manufacturer_url: The device manufacturer's online URL (if any)
-* model_description: A (human readable) model description of the device (if any)
-* model_name: The model name of the device (if any)
-* model_number: The model number (usually a product version, or revision) of the
-  device (if any)
-* model_url: An URL to an online device model description (if any)
-* presentation_url: The URL to connect to when double-clicking on the device, 
-  usually showing status or configuration webpages (if any)
-* serial_number: The serial number of the device, often matching with the MAC 
-  address (if any)
+1. interface: The network interface on which the service has been discovered
+   (following the OS notation, eg: 'eth0')
+2. protocol: The type of IP protocol on which the service is published ('ipv4'
+   or 'ipv6')
+3. udn: The UDN of the UPnP device (unique ID)
+4. hostname: The hostname (IP address) of the device, extracted from the
+   presentation URL
+5. port: The TCP port on which the device will provide a web interface,
+   extracted from the presentation URL
+6. friendly_name: The UPnP friendly name (displayed when browsing the network 
+   neighborhood)
+7. location: The URL of the xml device description
+8. manufacturer: The device manufacturer (if any)
+9. manufacturer_url: The device manufacturer's online URL (if any)
+10. model_description: A (human readable) model description of the device (if any)
+11. model_name: The model name of the device (if any)
+12. model_number: The model number (usually a product version, or revision) of the
+    device (if any)
+13. model_url: An URL to an online device model description (if any)
+14. presentation_url: The URL to connect to when double-clicking on the device, 
+    usually showing status or configuration webpages (if any)
+15. serial_number: The serial number of the device, often matching with the MAC 
+    address (if any)
 
 #### `Expect Service On IP`
 
