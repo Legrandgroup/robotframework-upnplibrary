@@ -738,6 +738,8 @@ class UpnpLibrary:
         else:
             self._upnp_browser_exec_path = upnp_browser_exec_path
         self._use_sudo_for_arping = use_sudo_for_arping
+        self._added_device_event = threading.Event()    # New device added event (an event watcher like self._set_events_on_device_event() needs to be called in order for this flag to be representative)
+        self._removed_device_event = threading.Event()    # New device remove event (same note as above)
 
     def _parse_upnp_browse_output(self, upnp_browse_process, interface_name_filter = None, ip_type_filter = None, event_callback = None):
         """Parse the output of an existing upnp-browse command and update self._service_database accordingly until the subprocess terminates
@@ -769,13 +771,51 @@ class UpnpLibrary:
                             event_callback(upnp_event) # If there is a callback to trigger when an event is processed, also run the callback
             line = upnp_browse_process.stdout.readline()
 
-    def get_services(self, device_type = 'upnp:rootdevice', interface_name = None, ip_type = None, resolve_ip = True):
+    def _set_internal_events_on_new_device_event(self, event):
+        """Set threading.Event flags when a new device event is received
+        
+        This function will set self._added_device_event when \p event corresponds to an added device event and will set self._removed_device_event when \p event corresponds to an removed device event
+        It is aimed to be provided as a callback (argument event_callback) to _parse_upnp_browse_output
+        
+        \param event The new event received
+        """
+        if event.event == 'add':
+            #logger.debug('Got add event... setting self._added_device_event')
+            self._added_device_event.set()
+        elif event.event == 'del':
+            #logger.debug('Got add event... setting self._removed_device_event')
+            self._removed_device_event.set()
+            
+    def _kill_process_at_timeout(self, process, threading_event, timeout, disable_event = None):
+        """Kill a UpnpBrowse.py subprocess when a threading event has not been set for longer than \p timeout
+        
+        At each new triggering event, we will clear again threading_event... and wait for \p timeout seconds on it to be set again... if it is not set after this timeout, we will send a SIGKILL to \p process (a subprocess.Popen object)
+        This function should be run in a secondary thread and acts as a watchdog
+        
+        \param process The subprocess.Popen object to send a kill signal to
+        \param threading_event The threading.Event to watch
+        \param timeout The timeout after which we will kill the subprocess if \p threading_event has not been set()
+        \param stop_event An optional threading.Event used to disable this function (if it is set when the timeout occurs, we will exit without sending the kill signal)
+        """
+        while threading_event.wait(timeout):
+            #logger.debug('Watchdog reset for ' + str(timeout) + 's')
+            threading_event.clear() # Reset the event and wait again
+        #logger.debug('Watchdog trigerred')
+        if not disable_event is None:
+            if disable_event.is_set():
+                return
+        logger.info('Killing subprocess ' + str(process.pid))
+        process.kill()
+         
+        
+    def get_services(self, device_type = 'upnp:rootdevice', interface_name = None, ip_type = None, resolve_ip = True, timeout = 2):
         """Get all currently published UPnP services as a list
         
         First (optional) argument `device_type` is the type of service (in the GUPnP terminology, the default value being `upnp:rootdevice`)
         Second (optional) argument `interface_name` is the name of the network interface on which to browse for UPnP devices (if not specified, search will be performed on all valid network interfaces)
         Third (optional) argument `ip_type` is the type of IP protocol to filter our (eg: `ipv6`, or `ipv4`, the default values being any IP version)
         Fourth (optional) argument `resolve_ip`, when True, will also include the MAC address of devices in results (default value is to resolve IP addresses)
+        Fifth (optional) argument `timeout`, is the timeout we will wait after each newly discovered device before considering we have finished the network discovery (increase this on slow networks)
         
         Return a list of services found on the network (one entry per service, each service being described by a tuple containing (interface_osname, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address) = tuple
         The return value can be stored and re-used later on to rework on this service list (see keyword `Import Results`) 
@@ -800,8 +840,13 @@ class UpnpLibrary:
         else:
             device_type_arg = []
 
-        p = subprocess.Popen([self._upnp_browser_exec_path, '-i', interface_name, '-t'] + device_type_arg, stdout=subprocess.PIPE)
-        self._parse_upnp_browse_output(upnp_browse_process=p, interface_name_filter=interface_name, ip_type_filter=ip_type)
+        self._added_device_event.clear()    # Clear _added_device_event to start watching for newly discovered devices
+        p = subprocess.Popen([self._upnp_browser_exec_path, '-i', interface_name] + device_type_arg, stdout=subprocess.PIPE)
+        _added_device_timeout_handler = threading.Thread(target = self._kill_process_at_timeout, args=(p, self._added_device_event, timeout))    # Start a background thread that will stop the subprovess when no new discovery occurs within a specified timeout
+        _added_device_timeout_handler.setDaemon(True)    # D-Bus loop should be forced to terminate when main program exits
+        _added_device_timeout_handler.start()
+        
+        self._parse_upnp_browse_output(upnp_browse_process=p, interface_name_filter=interface_name, ip_type_filter=ip_type, event_callback=self._set_internal_events_on_new_device_event)   # We use self._set_internal_events_on_new_device_event() as callback so that it will set _added_device_event to reset the watchdog handled by thread _added_device_timeout_handler
         
         with self._service_database_mutex:
             logger.debug('Services found: ' + str(self._service_database))
