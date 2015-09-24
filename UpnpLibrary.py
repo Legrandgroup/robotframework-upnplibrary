@@ -708,7 +708,7 @@ value:%s
                 upnp_device = self._database[key]
                 if not upnp_device is None:
                     service_name_product = upnp_device.friendly_name
-                    if service_name_product == service_name_product:
+                    if service_name_product == searched_name:
                         ip_address = upnp_device.ip_address
                         if match is None:
                             match = ip_address
@@ -1161,7 +1161,7 @@ if __name__ == '__main__':
         MAC = '00:04:74:12:00:00'
         exp_device = 'Wifi_wifi-soho_120000'
     elif host=='hal2':
-        IP = '10.10.8.75'
+        IP = '10.10.8.31'
         MAC = '00:04:74:05:00:BA'
         exp_device = 'LegrandAP_AP Wifi_0500BA'
     
@@ -1170,10 +1170,10 @@ if __name__ == '__main__':
     UL = UpnpLibrary()
     input('Press enter & "Enable UPnP" on device')
     temp_cache = UL.get_services(interface_name='eth0')
-    print(UL.get_ipv4_for_device_name(exp_device))
+    print('For device ' + exp_device + ', got IP ' + UL.get_ipv4_for_device_name(exp_device))
     if IP != UL.get_ipv4_for_device_name(exp_device):
         raise Exception('Error')
-    print(UL.get_ipv4_for_mac(MAC))
+    print('For MAC ' + MAC + ', got IP ' + UL.get_ipv4_for_mac(MAC))
     if IP != UL.get_ipv4_for_mac(MAC):
         raise Exception('Error')
     #if 'fe80::21a:64ff:fe94:86a2' != UL.get_ipv6_for_mac(MAC):
