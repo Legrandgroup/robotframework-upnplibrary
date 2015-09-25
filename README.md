@@ -152,6 +152,34 @@ service cache.
 To make sure you restrict to IPv4 or IPv6, filter IP types when running 
 `Get Services`
 
+#### `Expect Service On MAC`
+
+*Test if the specified MAC address correspond to a device avertising using UPnP*
+
+Note: the search will be performed on the service cache so `Get Services` or 
+`Import Results` must have been run prior to calling this keyword
+
+Also this means that this keyword will perform not perform the check for service
+right now but rather at the time the last `Get Services` updated the internal
+service cache.
+
+In order to use this keyword, you will need to request IP to MAC address 
+resolution (6th argument of Get Services)
+
+#### `Expect No Service On MAC`
+
+*Test if the device with the specified IP address does not avertise using UPnP*
+
+Note: the search will be performed on the service cache so `Get Services` or 
+`Import Results` must have been run prior to calling this keyword
+
+Also this means that this keyword will perform not perform the check for service
+right now but rather at the time the last `Get Services` updated the internal
+service cache.
+
+In order to use this keyword, you will need to request IP to MAC address 
+resolution (6th argument of Get Services)
+
 #### `Get Service On IP`
 
 *Filters results obtained by `Get Services` only returning entries for a 
@@ -167,6 +195,9 @@ specific MAC address... will obviously have MAC resolution on results*
 
 Note: this will have the side effect of changing the current database results 
 from `Get Services` (used by other keywords)
+
+In order to use this keyword, you will need to request IP to MAC address 
+resolution (6th argument of Get Services)
 
 #### `Get IPv4 For MAC`
 
@@ -262,4 +293,35 @@ friendly name)*
 
 *Wait (until a timeout) for a service to stop adverstising using UPnP (selection
 by friendly name)*
+
+#### `Clear Results`
+
+*Empty a result cache as set by `Get Services` or `Import Results`*
+
+#### `Wait For Upnp On IP`
+
+*Wait for a device to publish at least one service*
+
+#### `Wait For No Upnp On IP`
+
+*Wait for a device to stop publish any service*
+
+#### `Wait For Upnp On MAC`
+
+*Wait for a device to publish at least one service*
+
+#### `Wait For No Upnp On MAC`
+
+*Wait for a device to stop publish any service*
+
+#### `Details For Device Name`
+
+*Get the whole service details (tuple) based on a device name (and 
+optionally a host specified by either its MAC address of IP address)*
+
+#### `Details For Device Type`
+
+*Get the whole service details (tuple) based on a device type (and 
+optionally a port (recommended) and optionnally a host specified by either 
+its MAC address of IP address)*
 
