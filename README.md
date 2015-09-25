@@ -100,24 +100,28 @@ element are (in order).
 2. `protocol`: The type of IP protocol on which the service is published ('ipv4'
    or 'ipv6')
 3. `udn`: The UDN of the UPnP device (unique ID)
-4. `hostname`: The hostname (IP address) of the device, extracted from the
-   presentation URL
-5. `port`: The TCP port on which the device will provide a web interface,
+4. `hostname`: The hostname of the device, extracted from the
+   presentation URL (note: this is currently equivalent to ip_address, but if
+   you want an IP address, please use the next element, as name resolution might
+   be performed on `ip_address` but will never be performed on `hostname`)
+5. `ip_address`: The IP address of the device, extracted from the
+   presentation URL (note: this is currently equivalent to `ip_address`)
+6. `port`: The TCP port on which the device will provide a web interface,
    extracted from the presentation URL
-6. `friendly_name`: The UPnP friendly name (displayed when browsing the network 
+7. `friendly_name`: The UPnP friendly name (displayed when browsing the network 
    neighborhood)
-7. `location`: The URL of the xml device description
-8. `manufacturer`: The device manufacturer (if any)
-9. `manufacturer_url`: The device manufacturer's online URL (if any)
-10. `model_description`: A (human readable) model description of the device (if 
+8. `location`: The URL of the xml device description
+9. `manufacturer`: The device manufacturer (if any)
+10. `manufacturer_url`: The device manufacturer's online URL (if any)
+11. `model_description`: A (human readable) model description of the device (if 
     any)
-11. `model_name`: The model name of the device (if any)
-12. `model_number`: The model number (usually a product version, or revision) of
+12. `model_name`: The model name of the device (if any)
+13. `model_number`: The model number (usually a product version, or revision) of
     the device (if any)
-13. `model_url`: An URL to an online device model description (if any)
-14. `presentation_url`: The URL to connect to when double-clicking on the 
+14. `model_url`: An URL to an online device model description (if any)
+15. `presentation_url`: The URL to connect to when double-clicking on the 
     device, usually showing status or configuration webpages (if any)
-15. `serial_number`: The serial number of the device, often matching with the 
+16. `serial_number`: The serial number of the device, often matching with the 
     MAC address (if any)
 
 #### `Expect Service On IP`

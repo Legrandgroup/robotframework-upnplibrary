@@ -591,7 +591,7 @@ value:%s
     def export_to_tuple_list(self):
         """\brief Export this database to a list of tuples (so that it can be processed by RobotFramework keywords)
          
-        \return A list of tuples containing (interface, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)
+        \return A list of tuples containing (interface, protocol, udn, hostname, ip_address, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)
         """
         export = []
         try:
@@ -603,6 +603,7 @@ value:%s
             (interface_osname, protocol, udn) = key
             if upnp_device:
                 hostname = upnp_device.hostname
+                ip_address = upnp_device.ip_address
                 port = upnp_device.port
                 device_type = upnp_device.device_type
                 friendly_name = upnp_device.friendly_name
@@ -616,7 +617,7 @@ value:%s
                 presentation_url = upnp_device.presentation_url
                 serial_number = upnp_device.serial_number
                 mac_address = upnp_device.mac_address
-                export += [(interface_osname, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)]
+                export += [(interface_osname, protocol, udn, hostname, ip_address, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address)]
          
         return export
          
@@ -817,7 +818,7 @@ class UpnpLibrary:
         Fourth (optional) argument `resolve_ip`, when True, will also include the MAC address of devices in results (default value is to resolve IP addresses)
         Fifth (optional) argument `timeout`, is the timeout we will wait after each newly discovered device before considering we have finished the network discovery (increase this on slow networks)
         
-        Return a list of services found on the network (one entry per service, each service being described by a tuple containing (interface_osname, protocol, udn, hostname, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address) = tuple
+        Return a list of services found on the network (one entry per service, each service being described by a tuple containing (interface_osname, protocol, udn, hostname, ip_address, port, device_type, friendly_name, location, manufacturer, manufacturer_url, model_description, model_name, model_number, model_url, presentation_url, serial_number, mac_address) = tuple
         The return value can be stored and re-used later on to rework on this service list (see keyword `Import Results`) 
         
         Example:
