@@ -1016,7 +1016,7 @@ class UpnpLibrary:
         
         Note: running this keyword will have the effect of changing the current database results from `Get Services` (used by other keywords)
         
-        In order to use this keyword, you will need to request IP to MAC address resolution (6th argument of Get Services)
+        In order to use this keyword, you will need to request IP to MAC address resolution (4th argument of Get Services)
         
         Example:
         | Get Services | upnp:rootdevice | eth1 | ipv4 |
@@ -1060,7 +1060,7 @@ class UpnpLibrary:
         
         Note: `Get Services` or `Import Results` must have been run prior to calling this keyword
         
-        In order to use this keyword, you will need to request IP to MAC address resolution (6th argument of Get Services)
+        In order to use this keyword, you will need to request IP to MAC address resolution (4th argument of Get Services)
         
         Example:
         | Expect Service On MAC | 00:04:74:05:38:38 |
@@ -1075,7 +1075,7 @@ class UpnpLibrary:
         
         Note: `Get Services` or `Import Results` must have been run prior to calling this keyword
         
-        In order to use this keyword, you will need to request IP to MAC address resolution (6th argument of Get Services)
+        In order to use this keyword, you will need to request IP to MAC address resolution (4th argument of Get Services)
         
         Example:
         | Expect No Service On MAC | 00:04:74:05:38:38 |
@@ -1091,7 +1091,7 @@ class UpnpLibrary:
         Note: The search will be performed on the service cache so `Get Services` or `Import Results` must have been run prior to calling this keyword
         If there is more than one IPv4 address matching with the MAC address, an exception will be raised (unlikely except if there is an IP address update in the middle of `Get Services`)
         
-        In order to use this keyword, you will need to request IP to MAC address resolution (6th argument of Get Services)
+        In order to use this keyword, you will need to request IP to MAC address resolution (4th argument of Get Services)
         
         Return the IPv4 address or None if the MAC address was not found.
         
@@ -1110,7 +1110,7 @@ class UpnpLibrary:
         Note: The search will be performed on the service cache so `Get Services` or `Import Results` must have been run prior to calling this keyword
         If there is more than one IPv4 address matching with the MAC address, an exception will be raised (unlikely except if there is an IP address update in the middle of `Get Services`)
         
-        In order to use this keyword, you will need to request IP to MAC address resolution (6th argument of Get Services)
+        In order to use this keyword, you will need to request IP to MAC address resolution (4th argument of Get Services)
         
         Return the IPv6 address or None if the service was not found.
         

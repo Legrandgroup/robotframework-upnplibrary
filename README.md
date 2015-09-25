@@ -164,7 +164,7 @@ right now but rather at the time the last `Get Services` updated the internal
 service cache.
 
 In order to use this keyword, you will need to request IP to MAC address 
-resolution (6th argument of Get Services)
+resolution (4th argument of Get Services)
 
 #### `Expect No Service On MAC`
 
@@ -178,7 +178,7 @@ right now but rather at the time the last `Get Services` updated the internal
 service cache.
 
 In order to use this keyword, you will need to request IP to MAC address 
-resolution (6th argument of Get Services)
+resolution (4th argument of Get Services)
 
 #### `Get Service On IP`
 
@@ -197,7 +197,7 @@ Note: this will have the side effect of changing the current database results
 from `Get Services` (used by other keywords)
 
 In order to use this keyword, you will need to request IP to MAC address 
-resolution (6th argument of Get Services)
+resolution (4th argument of Get Services)
 
 #### `Get IPv4 For MAC`
 
@@ -213,7 +213,7 @@ service cache.
 We can only search devices which did publish a UPnP service that was in the 
 filter of a call to `Get Services`
 In order to use this keyword, you will need to request IP to MAC address 
-resolution (6th argument of `Get Services`)
+resolution (4th argument of `Get Services`)
 
 If there is more than one IPv4 address matching with the MAC address, an 
 exception will be raised (unlikely except if there is an IP address update in 
@@ -233,7 +233,7 @@ service cache.
 We can only search devices which did publish a UPnP service that was in the 
 filter of a call to `Get Services`
 In order to use this keyword, you will need to request IP to MAC address 
-resolution (6th argument of `Get Services`)
+resolution (4th argument of `Get Services`)
 
 If there is more than one IPv6 address matching with the MAC address, an 
 exception will be raised (unlikely except if there is an IP address update in 
