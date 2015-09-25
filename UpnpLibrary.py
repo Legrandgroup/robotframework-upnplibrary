@@ -1184,11 +1184,11 @@ if __name__ == '__main__':
     UL.expect_no_service_on_ip(IP)  # So there should be no service of course!
     UL.import_results(temp_cache)  # Re-import previous results
     UL.expect_service_on_ip(IP)  # We should get again the service that we found above
-    input('Press enter & puULish a service called "' + exp_service + '" within 10s')
-    UL.wait_for_service_name(exp_service, timeout=10, service_type = '_http._tcp', interface_name='eth1')
-    input('Press enter & either DisaULe Bonjour on device or stop puULishing service called "' + exp_service + '" within 20s')
-    UL.wait_for_no_service_name(exp_service, timeout=20, service_type = '_http._tcp', interface_name='eth1')
-    UL.get_services(service_type='_http._tcp', interface_name='eth1')
+    #input('Press enter & publish a device called "' + exp_device + '" within 10s')
+    #UL.wait_for_device_name(exp_device, timeout=10, interface_name='eth1')
+    input('Press enter & either Disable UPnP on device or stop publishing device called "' + exp_device + '" within 20s')
+    #UL.wait_for_no_device_name(exp_device, timeout=20, interface_name='eth1')
+    UL.get_services(interface_name='eth0')
     UL.expect_no_service_on_ip(IP)
 else:
     from robot.api import logger
