@@ -900,7 +900,9 @@ class UpnpLibrary:
             device_type_arg = []
 
         self._added_device_event.clear()    # Clear _added_device_event to start watching for newly discovered devices
-        p = subprocess.Popen([self._upnp_browser_exec_path, '-i', interface_name] + device_type_arg, stdout=subprocess.PIPE)
+        cmd = [self._upnp_browser_exec_path, '-i', interface_name] + device_type_arg
+        logger.debug('Now running subscript ' + str(cmd))
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         _added_device_timeout_handler = threading.Thread(target = self._kill_process_at_timeout, args=(p, self._added_device_event, timeout))    # Start a background thread that will stop the subprovess when no new discovery occurs within a specified timeout
         _added_device_timeout_handler.setDaemon(True)    # D-Bus loop should be forced to terminate when main program exits
         _added_device_timeout_handler.start()
