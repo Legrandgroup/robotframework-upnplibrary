@@ -231,49 +231,71 @@ class UpnpBrowseDeviceEvent:
         else:
             raise Exception('UnknownType:' + type)
         
-        if len(entry_array) != 14:
+        if self.event == 'add' and len(entry_array) != 14:
             raise Exception('InvalidEntry')
-
+        #else:
+        #    print('Processing new entry: ' + str(entry_array))
+        
         self.interface = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[1])
         if not self.interface:
             raise Exception('InvalidEntry')
         self.udn = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[2])
         if not self.udn:
             raise Exception('InvalidEntry')
-        self.device_type = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[3])
-        if not self.device_type:
-            raise Exception('InvalidEntry')
-        self.friendly_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[4])
-        if not self.friendly_name:
-            self.friendly_name = None
-        self.location = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[5])
-        if not self.location:
-            self.location = None
-        self.manufacturer = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[6])
-        if not self.manufacturer:
-            self.manufacturer = None
-        self.manufacturer_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[7])
-        if not self.manufacturer_url:
-            self.manufacturer_url = None
-        self.model_description = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[8])
-        if not self.model_description:
-            self.model_description = None
-        self.model_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[9])
-        if not self.model_name:
-            self.model_name = None
-        self.model_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[10])
-        if not self.model_number:
-            self.model_number = None
-        self.model_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[11])
-        if not self.model_url:
-            self.model_url = None
-        self.presentation_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[12])
-        if not self.presentation_url:
-            self.presentation_url = None
-        self.serial_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[13])
-        if not self.serial_number:
-            self.serial_number = None
-
+        
+        self.device_type = None
+        self.friendly_name = None
+        self.location = None
+        self.manufacturer = None
+        self.manufacturer_url = None
+        self.model_description = None
+        self.model_name = None
+        self.model_number = None
+        self.model_url = None
+        self.presentation_url = None
+        self.serial_number = None
+        
+        try:
+            self.device_type = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[3])
+            if not self.device_type:
+                if self.event == 'add':
+                    raise Exception('InvalidEntry')
+                self.device_type = None
+            self.friendly_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[4])
+            if not self.friendly_name:
+                if self.event == 'add':
+                    raise Exception('InvalidEntry')
+                self.friendly_name = None
+            self.location = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[5])
+            if not self.location:
+                self.location = None
+            self.manufacturer = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[6])
+            if not self.manufacturer:
+                self.manufacturer = None
+            self.manufacturer_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[7])
+            if not self.manufacturer_url:
+                self.manufacturer_url = None
+            self.model_description = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[8])
+            if not self.model_description:
+                self.model_description = None
+            self.model_name = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[9])
+            if not self.model_name:
+                self.model_name = None
+            self.model_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[10])
+            if not self.model_number:
+                self.model_number = None
+            self.model_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[11])
+            if not self.model_url:
+                self.model_url = None
+            self.presentation_url = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[12])
+            if not self.presentation_url:
+                self.presentation_url = None
+            self.serial_number = UpnpBrowseDeviceEvent.unescape_upnpbrowse_string(entry_array[13])
+            if not self.serial_number:
+                self.serial_number = None
+        except IndexError as e:
+            if self.event == 'add':
+                raise	# Only propagate array out of bound exception for 'add' events (not for 'del' events that often have incomplete fields)
         self.txt_missing_end = False
     
     def continued_on_next_line(self):
@@ -517,9 +539,18 @@ value:%s
         """
 
         logger.debug('Removing entry ' + str(key) + ' from database')
-        if key in self._database.keys():
-            del self._database[key]
-            
+        (interface_osname, protocol, udn) = key
+        if protocol is not None:	# Protocol may not be provided, in that case, we consider it a wildcard (remove all protocols)
+            if key in self._database.keys():
+                del self._database[key]
+        else:	# Protocol is none, remove all entries matching this interface and udn
+            #print('Using delete with wildcard on protocol')
+            for db_key in self._database.keys():
+                (db_interface_osname, db_protocol, db_udn) = db_key
+                if db_interface_osname == interface_osname and db_udn == udn:	# Both interface_osname and udn match
+                    logger.debug('Deleting key (' + str(db_interface_osname) + ', *=' + str(db_protocol) + ', ' + str(db_udn) + ') from database using wildcard for protocol')
+                    del self._database[db_key]
+    
     def reset(self):
         """\brief Empty the database"""
         self._database = {}
@@ -532,15 +563,18 @@ value:%s
         
         presentation_url = upnp_event.presentation_url
         
-        (purl_proto, purl_hostname, purl_port, purl_path) = UpnpDeviceDatabase._upnp_purl_to_details(presentation_url)
-        
-        ip_version = guess_ip_version(purl_hostname)
-        if ip_version == 4:
-            protocol = 'ipv4'
-        elif ip_version == 6:
-            protocol = 'ipv6'
+        if presentation_url is not None:
+            (purl_proto, purl_hostname, purl_port, purl_path) = UpnpDeviceDatabase._upnp_purl_to_details(presentation_url)
+            
+            ip_version = guess_ip_version(purl_hostname)
+            if ip_version == 4:
+                protocol = 'ipv4'
+            elif ip_version == 6:
+                protocol = 'ipv6'
+            else:
+                protocol = None
         else:
-            protocol = None
+            protocol = None	# No presentation URL... cannot guess protocol, set it to unknown
         
         key = (upnp_event.interface, protocol, upnp_event.udn)
         
@@ -780,7 +814,7 @@ class UpnpLibrary:
         line = upnp_browse_process.stdout.readline()
         while line:
             line = line.rstrip('\n')
-            print('upnp-browse:"' + line + '"')
+            #print('upnp-browse:"' + line + '"')
             if previous_line_continued:
                 upnp_event.add_line(line)
             else:
