@@ -493,7 +493,8 @@ value:%s
             upnp_device.mac_address = None
             if protocol == 'ipv4':
                 try:
-                    mac_address_list = arping(upnp_device.ip_address, interface_osname, use_sudo=self.use_sudo_for_arping, logger=logger)
+                    phys_interface_osname = interface_osname.split(':')[0]	# Extract the physical interface name for arping (eg: arping should be done on 'eth1', not on 'eth1:avahi')
+                    mac_address_list = arping(upnp_device.ip_address, phys_interface_osname, use_sudo=self.use_sudo_for_arping, logger=logger)
                     if len(mac_address_list) != 0:
                         if len(mac_address_list) > 1:  # More than one MAC address... issue a warning
                             logger.warn('Got more than one MAC address for host ' + str(upnp_device.ip_address) + ': ' + str(mac_address_list) + '. Using first')
